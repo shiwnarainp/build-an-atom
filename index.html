@@ -1,0 +1,941 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body>
+<title>Build an Atom</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: a lab bench. Header with progress, a tab strip of six stations plus the final check, one station open at a time. Model on the left, readouts on the right; stacks to one column on phones. */
+:root{
+  --bg:#eef1f5; --panel:#ffffff; --panel2:#f6f8fb; --ink:#152030; --muted:#566476; --line:#d5dce5;
+  --accent:#a8560c; --accent-ink:#ffffff; --accent-soft:#fbead6;
+  --pro:#d63a3a; --neu:#7f8996; --ele:#2667d9; --pro-soft:#fde4e4; --neu-soft:#e8ebef; --ele-soft:#e0eafc;
+  --ok:#1d7f48; --ok-soft:#dff3e7; --no:#b83232; --no-soft:#fbe3e3; --warn:#8a5a00; --warn-soft:#fbf0d4;
+  --display:"Sora",ui-sans-serif,system-ui,sans-serif;
+  --body:"Source Sans 3",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d131a; --panel:#141c26; --panel2:#19232f; --ink:#e6ecf3; --muted:#97a5b5; --line:#2a3644;
+  --accent:#f0a540; --accent-ink:#1a1206; --accent-soft:#3a2a12;
+  --pro:#ff6464; --neu:#a3adb9; --ele:#5c9cff; --pro-soft:#3b1d20; --neu-soft:#252e39; --ele-soft:#1a2a45;
+  --ok:#4fc887; --ok-soft:#15301f; --no:#ff7a7a; --no-soft:#3a1c1c; --warn:#f2c35a; --warn-soft:#3a2f12;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d131a; --panel:#141c26; --panel2:#19232f; --ink:#e6ecf3; --muted:#97a5b5; --line:#2a3644;
+  --accent:#f0a540; --accent-ink:#1a1206; --accent-soft:#3a2a12;
+  --pro:#ff6464; --neu:#a3adb9; --ele:#5c9cff; --pro-soft:#3b1d20; --neu-soft:#252e39; --ele-soft:#1a2a45;
+  --ok:#4fc887; --ok-soft:#15301f; --no:#ff7a7a; --no-soft:#3a1c1c; --warn:#f2c35a; --warn-soft:#3a2f12;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+.wrap{max-width:1140px;margin:0 auto}
+h1,h2,h3{font-family:var(--display);line-height:1.2;text-wrap:balance;margin:0}
+h1{font-size:clamp(1.9rem,4vw,2.6rem);letter-spacing:-.02em}
+h2{font-size:1.45rem;letter-spacing:-.01em}
+h3{font-size:1.1rem}
+p{margin:0}
+.eyebrow{font-family:var(--mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)} .small{font-size:.9rem}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);
+  font-weight:700;padding:8px 14px;border-radius:8px;cursor:pointer;line-height:1.2}
+.btn:hover{filter:brightness(1.07)}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn.ghost:hover{border-color:var(--accent)}
+.btn.sm{padding:5px 10px;font-size:.88rem}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.stack{display:grid;gap:14px}
+
+/* header */
+.top{padding-block:22px 6px}
+.top .wrap{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between}
+.top .sub{color:var(--muted);font-size:1.05rem}
+.tools{display:flex;gap:8px;flex-wrap:wrap}
+.goals{margin-top:16px;border:1px solid var(--line);background:var(--panel);border-radius:var(--r);padding:10px 16px}
+.goals summary{cursor:pointer;font-weight:700}
+.goals .g{display:grid;gap:10px;margin-top:10px;max-width:75ch}
+.goals ol{margin:4px 0 0;padding-left:22px}
+.progress{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:16px}
+.progress .bar{flex:1 1 180px;height:8px;background:var(--line);border-radius:99px;overflow:hidden;min-width:120px}
+.progress .bar i{display:block;height:100%;background:var(--ok);border-radius:99px;transition:width .4s}
+.progress .lbl{font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;margin:14px 0 20px;border-bottom:1px solid var(--line)}
+nav.tabs button{border:0;background:none;padding:10px 12px;cursor:pointer;color:var(--muted);font-weight:600;white-space:nowrap;border-bottom:3px solid transparent}
+nav.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+nav.tabs .ck{color:var(--ok);margin-left:4px}
+
+/* sections & cards */
+section[data-tab]{display:grid;gap:18px}
+.shead{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:flex-start}
+.shead .t{display:grid;gap:4px;max-width:70ch}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:grid;gap:12px;min-width:0;align-content:start}
+.card.flat{background:var(--panel2)}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
+.grid2.l{grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr)}
+@media (max-width:820px){.grid2,.grid2.l{grid-template-columns:minmax(0,1fr)}}
+.note{border-left:4px solid var(--ele);background:var(--ele-soft);padding:10px 14px;border-radius:0 8px 8px 0}
+.note.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+.fb{min-height:1.4em;font-weight:600}
+.fb.ok{color:var(--ok)} .fb.no{color:var(--no)}
+.hint{background:var(--warn-soft);color:var(--ink);padding:8px 12px;border-radius:8px}
+.badge{display:inline-block;font-family:var(--mono);font-size:.75rem;padding:2px 8px;border-radius:99px;border:1px solid var(--line)}
+.badge.ok{background:var(--ok-soft);color:var(--ok);border-color:transparent}
+.badge.no{background:var(--no-soft);color:var(--no);border-color:transparent}
+.badge.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.tablewrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:center}
+thead th{background:var(--panel2);font-size:.9rem}
+tbody th{text-align:left;font-weight:600}
+
+/* atom model */
+.atom{width:100%;height:auto;display:block;max-width:100%}
+.atom .orbit{fill:none;stroke:var(--line);stroke-width:1.2;stroke-dasharray:3 3}
+.atom .pp circle{fill:var(--pro);stroke:var(--panel);stroke-width:.8}
+.atom .nn circle{fill:var(--neu);stroke:var(--panel);stroke-width:.8}
+.atom .ee circle{fill:var(--ele);stroke:var(--panel);stroke-width:.8}
+.atom text{fill:#fff;font:700 8px var(--mono);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.atom .shell{transform-origin:0 0;animation:spin var(--dur) linear infinite}
+.atom.click .pt{cursor:pointer}
+.atom.click .pt:hover circle{stroke:var(--accent);stroke-width:2}
+@keyframes spin{to{transform:rotate(360deg)}}
+body.still .atom .shell{animation:none}
+@media (prefers-reduced-motion:reduce){.atom .shell{animation:none}.reveal{animation:none!important}}
+.stage{background:radial-gradient(circle at 50% 45%,var(--panel2),var(--panel) 70%);border:1px solid var(--line);border-radius:var(--r);padding:8px;display:grid;place-items:center}
+.stage .atom{max-width:420px}
+.caption{font-size:.85rem;color:var(--muted)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.9rem}
+.dot{display:inline-block;width:12px;height:12px;border-radius:50%;vertical-align:-1px;margin-right:5px}
+.dot.p{background:var(--pro)} .dot.n{background:var(--neu)} .dot.e{background:var(--ele)}
+
+/* particle chips */
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:99px;padding:6px 12px;font-weight:700;cursor:grab;border:2px solid transparent;user-select:none}
+.chip.proton{background:var(--pro-soft);color:var(--pro)} .chip.neutron{background:var(--neu-soft);color:var(--ink)} .chip.electron{background:var(--ele-soft);color:var(--ele)}
+.chip[aria-pressed="true"]{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.chip .x{border:0;background:none;cursor:pointer;font-weight:700;padding:0 2px;color:inherit}
+.zones{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:820px){.zones{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:480px){.zones{grid-template-columns:minmax(0,1fr)}}
+.zone{border:2px dashed var(--line);border-radius:var(--r);padding:10px;display:grid;gap:8px;align-content:start;min-height:96px;background:var(--panel)}
+.zone.over{border-color:var(--accent);background:var(--accent-soft)}
+.zone.ok{border-style:solid;border-color:var(--ok);background:var(--ok-soft)}
+.zone.no{border-style:solid;border-color:var(--no);background:var(--no-soft)}
+.zone .zt{font-weight:700}
+.zone .zc{display:flex;flex-wrap:wrap;gap:6px}
+.zone .place{justify-self:start}
+.pinfo{display:grid;grid-template-columns:auto 1fr;gap:4px 14px}
+.pinfo dt{color:var(--muted)} .pinfo dd{margin:0;font-weight:600}
+
+/* MC */
+fieldset.mc{border:1px solid var(--line);border-radius:var(--r);padding:12px 16px;display:grid;gap:8px;margin:0;min-width:0}
+fieldset.mc legend{font-weight:700;padding:0 6px}
+.opt{display:flex;gap:10px;align-items:flex-start;padding:6px 8px;border-radius:8px;cursor:pointer}
+.opt:hover{background:var(--panel2)}
+.opt input{margin-top:5px;accent-color:var(--accent)}
+
+/* builder */
+.ctrls{display:grid;gap:10px}
+.ctrl{display:grid;grid-template-columns:1fr auto auto auto;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--r)}
+.ctrl.p{background:var(--pro-soft)} .ctrl.n{background:var(--neu-soft)} .ctrl.e{background:var(--ele-soft)}
+.ctrl .nm{font-weight:700} .ctrl .nm small{font-weight:600;color:var(--muted);margin-left:6px}
+.ctrl button{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--panel);font-size:1.3rem;font-weight:700;cursor:pointer;line-height:1}
+.ctrl output{font-family:var(--mono);font-size:1.3rem;min-width:2.2ch;text-align:center;font-weight:700}
+.tog{display:flex;gap:8px;align-items:center;cursor:pointer}
+.tog input{accent-color:var(--accent);width:18px;height:18px}
+.readout{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.ro{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 10px;display:grid;gap:2px}
+.ro span{font-size:.8rem;color:var(--muted)} .ro b{font-family:var(--mono);font-size:1.25rem}
+.idcard{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.tile{width:92px;height:100px;border:2px solid var(--accent);border-radius:10px;background:var(--accent-soft);display:grid;place-items:center;align-content:center;gap:0;flex:none}
+.tile .z{font-family:var(--mono);font-size:.85rem} .tile .s{font-family:var(--display);font-size:2.2rem;font-weight:700;line-height:1} .tile .n{font-size:.75rem}
+.idcard .big{font-family:var(--display);font-size:1.5rem;font-weight:700}
+.inv{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.steps{margin:0;padding-left:0;list-style:none;display:grid;gap:4px}
+.steps li::before{content:"○ ";color:var(--muted)} .steps li.done::before{content:"✓ ";color:var(--ok);font-weight:700}
+.steps li.done{color:var(--muted)}
+
+/* periodic table */
+.ptwrap{overflow-x:auto}
+.pt-grid{display:grid;grid-template-columns:repeat(18,minmax(28px,1fr));gap:3px;min-width:560px}
+.pt-cell{border:1px solid var(--line);border-radius:4px;background:var(--panel2);display:grid;place-items:center;padding:2px 0;line-height:1.05;aspect-ratio:1/1.05}
+.pt-cell .pz{font-family:var(--mono);font-size:.55rem;color:var(--muted)} .pt-cell .ps{font-weight:700;font-size:.85rem}
+.pt-cell.hi{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)} .pt-cell.hi .pz{color:var(--accent-ink)}
+button.pt-cell{cursor:pointer;font:inherit;color:inherit}
+.drawer{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--panel);border-top:1px solid var(--line);box-shadow:0 -8px 30px rgba(0,0,0,.18);
+  padding:14px max(16px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));max-height:70vh;overflow:auto}
+.drawer .wrap{display:grid;gap:10px}
+
+/* fields */
+.fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.fields.compact{grid-template-columns:repeat(3,minmax(0,1fr))}
+.fld{display:grid;gap:4px;font-size:.88rem;color:var(--muted);font-weight:600}
+input[type=text],input:not([type]){border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:8px 10px;width:100%;font-family:var(--mono);font-size:1.05rem;min-width:0}
+input.ok{border-color:var(--ok);background:var(--ok-soft);color:var(--ok);font-weight:700}
+input.no{border-color:var(--no);background:var(--no-soft)}
+input:disabled{opacity:1}
+.cell{width:64px;text-align:center}
+td.given{font-family:var(--mono);font-weight:700}
+td.solved{font-family:var(--mono);font-weight:700;color:var(--ok);background:var(--ok-soft)}
+tr.done th{color:var(--ok)}
+tr.hintrow td{text-align:left;background:var(--warn-soft);font-size:.92rem}
+.given-list{display:flex;flex-wrap:wrap;gap:8px}
+.gv{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px;font-size:.92rem}
+.gv b{font-family:var(--mono)}
+
+/* formulas */
+.formulas{display:grid;gap:6px;font-family:var(--mono);font-size:.92rem}
+.formulas div{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 10px}
+
+/* levels & mastery */
+.levels{display:flex;flex-wrap:wrap;gap:8px}
+.levels button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.mastery{display:grid;gap:6px}
+.mastery li{list-style:none;display:flex;gap:8px;align-items:center}
+.mastery ul{padding:0;margin:0;display:grid;gap:6px}
+
+/* detective */
+.cases{display:flex;flex-wrap:wrap;gap:8px}
+.cases button[aria-current="true"]{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.casefile{border:1px solid var(--line);border-left:6px solid var(--accent);border-radius:var(--r);background:var(--panel);padding:16px;display:grid;gap:12px}
+.reveal{animation:pop .7s cubic-bezier(.2,.9,.3,1.3)}
+@keyframes pop{from{transform:scale(.4);opacity:0}to{transform:none;opacity:1}}
+.revealbox{display:grid;grid-template-columns:minmax(0,200px) 1fr;gap:16px;align-items:center}
+@media (max-width:560px){.revealbox{grid-template-columns:minmax(0,1fr)}}
+
+/* isotope notation */
+.iso{display:inline-flex;align-items:center;font-family:var(--mono);line-height:1}
+.iso-n{display:inline-flex;flex-direction:column;align-items:flex-end;font-size:.5em;line-height:1.08;margin-right:.06em;font-weight:700}
+.iso-s{font-weight:700;font-family:var(--display)}
+.iso.huge{font-size:5.5rem}
+.iso.lg{font-size:2.2rem}
+.iso-c{font-size:.5em;align-self:flex-start;font-weight:700;margin-left:.04em}
+.isohero{display:flex;flex-wrap:wrap;gap:28px;align-items:center}
+.callouts{display:grid;gap:8px}
+.callouts div{display:flex;gap:10px;align-items:baseline}
+.callouts b{font-family:var(--mono);min-width:2.5ch;color:var(--accent)}
+.isoBuild{display:inline-grid;grid-template-columns:auto auto;grid-template-rows:auto auto;gap:4px 6px;align-items:center}
+.isoBuild input{width:66px;text-align:center}
+.isoBuild .s{grid-row:1/3;grid-column:2;width:80px;height:84px;font-size:2rem;font-family:var(--display);font-weight:700}
+.arow{display:grid;grid-template-columns:110px minmax(0,1fr);gap:14px;align-items:start;padding:10px 0;border-top:1px solid var(--line)}
+.arow:first-child{border-top:0}
+@media (max-width:560px){.arow{grid-template-columns:minmax(0,1fr)}}
+.cmp{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.cmp .card{padding:10px;text-align:center}
+.checks{display:flex;flex-wrap:wrap;gap:6px 18px}
+.checks label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.checks input{accent-color:var(--accent);width:17px;height:17px}
+
+/* final */
+.fq{border:1px solid var(--line);border-radius:var(--r);background:var(--panel);padding:14px 16px;display:grid;gap:10px;min-width:0}
+.fq.ok{border-color:var(--ok)} .fq.no{border-color:var(--no)}
+.fq .qh{display:flex;gap:10px;align-items:baseline;justify-content:space-between;flex-wrap:wrap}
+.fq .qn{font-family:var(--mono);color:var(--accent);font-weight:700}
+.fq .exp{background:var(--no-soft);border-radius:8px;padding:8px 12px}
+.scoreline{font-family:var(--display);font-size:2rem;font-weight:700}
+.qchips{display:flex;flex-wrap:wrap;gap:6px}
+.qchips button{width:40px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--panel);cursor:pointer;font-family:var(--mono);font-weight:700}
+.qchips button.ok{background:var(--ok-soft);color:var(--ok);border-color:var(--ok)}
+.qchips button.no{background:var(--no-soft);color:var(--no);border-color:var(--no)}
+textarea{width:100%;min-height:150px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);color:var(--ink);font-family:var(--mono);font-size:.85rem;padding:10px}
+</style>
+
+<header class="top"><div class="wrap">
+  <div>
+    <p class="eyebrow">Regents Chemistry · Atomic structure lab</p>
+    <h1>Build an Atom</h1>
+    <p class="sub">Discovering atomic number and mass number</p>
+  </div>
+  <div class="tools">
+    <button class="btn ghost" id="motionBtn" aria-pressed="true">Animation: on</button>
+    <button class="btn ghost" id="ptBtn" aria-expanded="false" aria-controls="ptDrawer">Periodic table</button>
+  </div>
+</div></header>
+
+<main class="wrap">
+  <details class="goals">
+    <summary>Learning goals</summary>
+    <div class="g">
+      <p><b>Essential question:</b> How can atomic number and mass number be used to determine the composition and identity of an atom?</p>
+      <p><b>Today I will</b> investigate how protons, neutrons, and electrons determine an atom’s atomic number, mass number, and identity.</p>
+      <p><b>So I can</b> use atomic number and mass number to calculate the numbers of protons, neutrons, and electrons in atoms.</p>
+      <div><b>I am successful when I can:</b>
+        <ol>
+          <li>Identify the location and charge of protons, neutrons, and electrons.</li>
+          <li>Explain that atomic number equals the number of protons.</li>
+          <li>Explain that mass number equals protons + neutrons.</li>
+          <li>Find the protons, electrons, and neutrons in a neutral atom.</li>
+          <li>Calculate mass number from protons and neutrons.</li>
+          <li>Calculate atomic number from particle information.</li>
+          <li>Calculate neutrons from mass number and atomic number.</li>
+          <li>Identify an element from its number of protons.</li>
+          <li>Interpret isotope notation.</li>
+          <li>Solve Regents-style questions with these relationships.</li>
+        </ol>
+      </div>
+      <p class="small muted">Standards: NYS P-12 Science Learning Standards, HS-PS1-1 (atomic structure and the periodic table).</p>
+    </div>
+  </details>
+
+  <div class="progress" id="progress"></div>
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Modules"></nav>
+
+  <!-- MODULE 1 -->
+  <section data-tab="m1" aria-labelledby="h-m1">
+    <div class="shead"><div class="t"><p class="eyebrow">Module 1</p><h2 id="h-m1">Meet the subatomic particles</h2><p class="muted">Click any particle in the model to see where it lives, its charge, and its mass.</p></div>
+      <button class="btn ghost sm" data-reset="m1">Reset module</button></div>
+    <div class="grid2">
+      <div class="card">
+        <div class="stage" id="m1atom"></div>
+        <div class="legend"><span><i class="dot p"></i>Proton (+1)</span><span><i class="dot n"></i>Neutron (0)</span><span><i class="dot e"></i>Electron (−1)</span></div>
+        <p class="caption">Simplified model of lithium-7, not to scale. A real nucleus is about 100,000 times smaller than the atom.</p>
+      </div>
+      <div class="card">
+        <h3 id="pinfoTitle">Pick a particle</h3>
+        <div id="pinfo" aria-live="polite"><p class="muted">Click a red, gray, or blue particle in the model.</p></div>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Particle</th><th>Location</th><th>Charge</th><th>Relative mass</th></tr></thead>
+          <tbody>
+            <tr><th scope="row"><i class="dot p"></i>Proton</th><td>Nucleus</td><td>+1</td><td>about 1 amu</td></tr>
+            <tr><th scope="row"><i class="dot n"></i>Neutron</th><td>Nucleus</td><td>0</td><td>about 1 amu</td></tr>
+            <tr><th scope="row"><i class="dot e"></i>Electron</th><td>Electron cloud</td><td>−1</td><td>about 0 amu</td></tr>
+          </tbody></table></div>
+        <p class="note">Electrons occupy orbitals in an electron cloud around the nucleus. The circular shells in these models are a simplified picture that helps us count electrons.</p>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Sort the particles</h3>
+      <p class="muted">Drag a particle into every statement it fits. Some statements fit more than one particle. On a Chromebook or keyboard: select a particle, then press <b>Place here</b>.</p>
+      <div class="row" id="chipBank" aria-label="Particles"></div>
+      <div class="zones" id="zones"></div>
+      <div class="row"><button class="btn" id="sortCheck">Check sorting</button><p class="fb" id="sortFb" aria-live="polite"></p></div>
+    </div>
+    <div class="card"><h3>Knowledge check</h3><div class="stack" id="m1mc"></div></div>
+  </section>
+
+  <!-- MODULE 2 -->
+  <section data-tab="m2" aria-labelledby="h-m2" hidden>
+    <div class="shead"><div class="t"><p class="eyebrow">Module 2</p><h2 id="h-m2">Build an atom</h2><p class="muted">Add and remove particles. Watch which numbers change the element, the isotope, or the charge.</p></div>
+      <button class="btn ghost sm" data-reset="m2">Reset module</button></div>
+    <div class="grid2 l">
+      <div class="card">
+        <div class="stage" id="bAtom"></div>
+        <p class="caption">Simplified Bohr-style model, not to scale. Electron shells follow the Reference Table configurations.</p>
+        <div class="ctrls">
+          <div class="ctrl p"><span class="nm">Protons <small>+1</small></span><button data-d="p,-1" aria-label="Remove a proton">−</button><output id="cp" aria-live="polite">1</output><button data-d="p,1" aria-label="Add a proton">+</button></div>
+          <div class="ctrl n"><span class="nm">Neutrons <small>0</small></span><button data-d="n,-1" aria-label="Remove a neutron">−</button><output id="cn" aria-live="polite">0</output><button data-d="n,1" aria-label="Add a neutron">+</button></div>
+          <div class="ctrl e"><span class="nm">Electrons <small>−1</small></span><button data-d="e,-1" aria-label="Remove an electron">−</button><output id="ce" aria-live="polite">1</output><button data-d="e,1" aria-label="Add an electron">+</button></div>
+        </div>
+        <label class="tog"><input type="checkbox" id="neutralTog"> Keep the atom neutral (electrons follow protons)</label>
+        <p class="fb" id="bMsg" aria-live="polite"></p>
+      </div>
+      <div class="card">
+        <div class="idcard" aria-live="polite"><div class="tile" id="bTile"></div><div><div class="big" id="bName"></div><div id="bIso"></div><div id="bStab"></div></div></div>
+        <div class="readout" id="bRead"></div>
+        <p class="small muted" id="bMass"></p>
+        <div class="ptwrap" id="bPT"></div>
+        <p class="caption">Simplified periodic table, elements 1–36. The highlighted box matches the number of protons.</p>
+      </div>
+    </div>
+    <div class="card">
+      <h3>Investigations</h3>
+      <div class="inv" id="invs"></div>
+    </div>
+  </section>
+
+  <!-- MODULE 3 -->
+  <section data-tab="m3" aria-labelledby="h-m3" hidden>
+    <div class="shead"><div class="t"><p class="eyebrow">Module 3</p><h2 id="h-m3">Discover atomic number and mass number</h2><p class="muted">Learn each relationship, then use it right away.</p></div>
+      <button class="btn ghost sm" data-reset="m3">Reset module</button></div>
+    <div class="grid2 l">
+      <div class="stack" id="m3parts"></div>
+      <div class="stack" style="align-content:start">
+        <div class="card flat fpanel"></div>
+        <details class="card"><summary><b>Common mix-ups</b></summary>
+          <div class="stack small" style="margin-top:10px">
+            <p><b>“Atomic number is the total number of particles.”</b> No. Atomic number counts protons only.</p>
+            <p><b>“Mass number includes electrons.”</b> No. Mass number = protons + neutrons.</p>
+            <p><b>“Changing neutrons changes the element.”</b> No. It changes the isotope. Only protons decide the element.</p>
+            <p><b>“Electrons always equal protons.”</b> Only in neutral atoms. Ions have more or fewer electrons.</p>
+            <p><b>“The atomic mass on the periodic table is the mass number.”</b> No. Mass number is a whole number for one isotope. The atomic mass (like 12.011 for carbon) is a weighted average of the naturally occurring isotopes.</p>
+            <p><b>“You can find neutrons from atomic number alone.”</b> No. You also need the mass number.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- MODULE 4 -->
+  <section data-tab="m4" aria-labelledby="h-m4" hidden>
+    <div class="shead"><div class="t"><p class="eyebrow">Module 4</p><h2 id="h-m4">Atomic number and mass number challenge</h2><p class="muted">Fill in every blank, then press <b>Check row</b>. Correct answers turn green and lock. A wrong answer gives you a hint. All atoms are neutral.</p></div>
+      <button class="btn ghost sm" data-reset="m4">Reset module</button></div>
+    <div class="card">
+      <div class="tablewrap"><table>
+        <thead><tr><th>Element</th><th>Atomic number</th><th>Mass number</th><th>Protons</th><th>Neutrons</th><th>Electrons</th><th></th></tr></thead>
+        <tbody id="t4body"></tbody></table></div>
+    </div>
+    <div class="grid2 l">
+      <div class="card">
+        <h3>Differentiated practice</h3>
+        <div class="levels" id="levels" role="group" aria-label="Practice level"></div>
+        <p class="muted small" id="lvlDesc"></p>
+        <div id="lvlProb"></div>
+        <div class="row"><button class="btn ghost" id="lvlNew">New problem</button><span class="small muted" id="lvlCount"></span></div>
+      </div>
+      <div class="stack" style="align-content:start">
+        <div class="card"><h3>Mastery tracker</h3><p class="small muted">A skill is marked when you get it right on the first try without a hint.</p><div class="mastery" id="mastery"></div></div>
+        <div class="card flat fpanel"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MODULE 5 -->
+  <section data-tab="m5" aria-labelledby="h-m5" hidden>
+    <div class="shead"><div class="t"><p class="eyebrow">Module 5</p><h2 id="h-m5">Atomic Detective: identify the mystery element</h2><p class="muted">Use the clues to calculate the missing numbers, then name the element. Hints get more specific each time you ask.</p></div>
+      <button class="btn ghost sm" data-reset="m5">Reset module</button></div>
+    <div class="cases" id="cases"></div>
+    <div class="casefile" id="casefile"></div>
+    <details class="card"><summary><b>Periodic table reference</b></summary><div class="ptwrap" id="m5PT" style="margin-top:10px"></div></details>
+  </section>
+
+  <!-- MODULE 6 -->
+  <section data-tab="m6" aria-labelledby="h-m6" hidden>
+    <div class="shead"><div class="t"><p class="eyebrow">Module 6</p><h2 id="h-m6">Isotope notation</h2><p class="muted">Isotope notation packs the mass number, atomic number, and symbol into one compact label.</p></div>
+      <button class="btn ghost sm" data-reset="m6">Reset module</button></div>
+    <div class="card">
+      <div class="isohero">
+        <div id="isoHero"></div>
+        <div class="callouts">
+          <div><b>14</b><span>Mass number (A), upper left: protons + neutrons</span></div>
+          <div><b>6</b><span>Atomic number (Z), lower left: protons</span></div>
+          <div><b>C</b><span>Element symbol: carbon</span></div>
+          <p class="muted">So carbon-14 has 6 protons, 6 electrons (neutral atom), and 14 − 6 = <b>8</b> neutrons.</p>
+        </div>
+      </div>
+    </div>
+    <div class="card"><h3>Activity A · Decode the atom</h3><p class="muted small">Find the protons, neutrons, and electrons in each neutral atom.</p><div id="m6a"></div></div>
+    <div class="card"><h3>Activity B · Create the symbol</h3>
+      <p>An atom contains <b>15 protons</b> and <b>16 neutrons</b>.</p>
+      <div id="m6b"></div>
+      <div id="m6bBuild" class="stack"></div>
+    </div>
+    <div class="card"><h3>Activity C · Compare isotopes</h3>
+      <div class="cmp" id="cmp"></div>
+      <div class="tablewrap"><table>
+        <thead><tr><th>Isotope</th><th>Atomic number</th><th>Mass number</th><th>Protons</th><th>Neutrons</th><th>Electrons</th></tr></thead>
+        <tbody id="cmpT"></tbody></table></div>
+      <div id="m6c" class="stack"></div>
+    </div>
+  </section>
+
+  <!-- FINAL -->
+  <section data-tab="final" aria-labelledby="h-fin" hidden>
+    <div class="shead"><div class="t"><p class="eyebrow">Final assessment</p><h2 id="h-fin">Regents Chemistry challenge</h2><p class="muted">15 questions. Answers are checked only when you submit. Assume every atom is neutral unless the question says otherwise.</p></div>
+      <div class="row"><span class="badge" id="finVer"></span><button class="btn ghost sm" id="finSwitch">Switch version</button><button class="btn ghost sm" data-reset="final">Reset assessment</button></div></div>
+    <div class="card" id="finReport" hidden></div>
+    <div class="stack" id="finList"></div>
+    <div class="row"><button class="btn" id="finSubmit">Submit assessment</button><p class="fb" id="finFb" aria-live="polite"></p></div>
+  </section>
+</main>
+
+<aside class="drawer" id="ptDrawer" hidden aria-label="Periodic table reference">
+  <div class="wrap">
+    <div class="row" style="justify-content:space-between"><h3>Periodic table · elements 1–36</h3><button class="btn ghost sm" id="ptClose">Close</button></div>
+    <div class="ptwrap" id="drawerPT"></div>
+    <p class="small" id="ptInfo">Select an element to see its name, atomic number, and average atomic mass.</p>
+  </div>
+</aside>
+
+<script>
+(function(){
+"use strict";
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const pick=a=>a[Math.floor(Math.random()*a.length)];
+const list=a=>a.length<2?(a[0]||''):a.slice(0,-1).join(', ')+(a.length>2?',':'')+' and '+a[a.length-1];
+
+/* ---------- element data (verified, Z 1–36) ---------- */
+const SYM=['','H','He','Li','Be','B','C','N','O','F','Ne','Na','Mg','Al','Si','P','S','Cl','Ar','K','Ca','Sc','Ti','V','Cr','Mn','Fe','Co','Ni','Cu','Zn','Ga','Ge','As','Se','Br','Kr'];
+const NAME=['','Hydrogen','Helium','Lithium','Beryllium','Boron','Carbon','Nitrogen','Oxygen','Fluorine','Neon','Sodium','Magnesium','Aluminum','Silicon','Phosphorus','Sulfur','Chlorine','Argon','Potassium','Calcium','Scandium','Titanium','Vanadium','Chromium','Manganese','Iron','Cobalt','Nickel','Copper','Zinc','Gallium','Germanium','Arsenic','Selenium','Bromine','Krypton'];
+const MASS=[0,1.008,4.0026,6.94,9.0122,10.81,12.011,14.007,15.999,18.998,20.180,22.990,24.305,26.982,28.085,30.974,32.06,35.45,39.95,39.098,40.078,44.956,47.867,50.942,51.996,54.938,55.845,58.933,58.693,63.546,65.38,69.723,72.630,74.922,78.971,79.904,83.798];
+// stable isotopes (mass numbers)
+const STABLE={1:[1,2],2:[3,4],3:[6,7],4:[9],5:[10,11],6:[12,13],7:[14,15],8:[16,17,18],9:[19],10:[20,21,22],11:[23],12:[24,25,26],13:[27],14:[28,29,30],15:[31],16:[32,33,34,36],17:[35,37],18:[36,38,40],19:[39,41],20:[40,42,43,44,46,48],21:[45],22:[46,47,48,49,50],23:[51],24:[50,52,53,54],25:[55],26:[54,56,57,58],27:[59],28:[58,60,61,62,64],29:[63,65],30:[64,66,67,68,70],31:[69,71],32:[70,72,73,74,76],33:[75],34:[74,76,77,78,80,82],35:[79,81],36:[78,80,82,83,84,86]};
+// well-known radioactive isotopes
+const RADIO={1:[3],2:[6],4:[7,10],6:[11,14],7:[13],8:[15],9:[18],11:[22,24],13:[26],15:[32],16:[35],17:[36],18:[39],19:[40],20:[41,45],24:[51],25:[54],26:[55,59],27:[60],28:[63],30:[65],34:[75],36:[85]};
+const ISO=[];for(const z in STABLE)STABLE[z].forEach(A=>ISO.push({z:+z,A}));
+function pos(z){if(z===1)return[1,1];if(z===2)return[1,18];if(z<=10)return[2,z<=4?z-2:z+8];if(z<=18)return[3,z<=12?z-10:z];return[4,z-18]}
+function shells(e){if(e<=0)return[];if(e<=2)return[e];if(e<=10)return[2,e-2];if(e<=18)return[2,8,e-10];
+  if(e<=36){const T3=[8,8,9,10,11,13,13,14,15,16,18,18,18,18,18,18,18,18],T4=[1,2,2,2,2,1,2,2,2,2,1,2,3,4,5,6,7,8];const i=e-19;return[2,8,T3[i],T4[i]]}
+  const T=[[8,1],[8,2],[9,2],[10,2]];return[2,8,18,...T[Math.min(3,e-37)]]}
+const vals=(z,A)=>({Z:z,A,p:z,n:A-z,e:z});
+
+/* ---------- state ---------- */
+const KEY='build-an-atom-v1';
+const DEF=()=>({v:1,tab:'m1',motion:true,formulas:true,mastery:{},
+  m1:{zones:{},mc:{},sortOk:false},
+  m2:{p:1,n:0,e:1,inv:null,step:{},mc:{},neutral:false},
+  m3:{st:{}},
+  m4:{cells:{},vals:{},rows:{},msg:{},hl:{},tries:{},lvl:1,prob:null,pst:{},lvDone:{}},
+  m5:{i:0,st:{},rand:null},
+  m6:{st:{},bNot:false,nb:{},c1:[],c2:[],cOk1:false,cOk2:false,aFirst:0},
+  fin:{ver:'A',ans:{},res:null,retry:false,name:''}});
+function load(){const d=DEF();try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s&&s.v===1){for(const k in d){if(s[k]!==undefined)d[k]=(d[k]&&typeof d[k]==='object'&&!Array.isArray(d[k]))?Object.assign(d[k],s[k]):s[k]}}}catch(e){}return d}
+let S=load();
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+
+/* ---------- shared drawing ---------- */
+function mix(p,n){const t=p+n,a=[];let pc=0;for(let i=0;i<t;i++){const want=Math.round((i+1)*p/t);if(want>pc){a.push('p');pc++}else a.push('n')}return a}
+function atomSVG(p,n,e,o={}){
+  const pr=6,c=pr*1.12,N=p+n,R=N?c*Math.sqrt(N)+pr:4;
+  const sh=shells(Math.min(e,40)),gap=19,R0=R+16;
+  const O=Math.max(sh.length?R0+gap*(sh.length-1)+9:R+10,44);
+  const kinds=mix(p,n);let nuc='';
+  for(let i=N-1;i>=0;i--){const r=c*Math.sqrt(i+.5),t=i*2.39996,x=(r*Math.cos(t)).toFixed(1),y=(r*Math.sin(t)).toFixed(1),isP=kinds[i]==='p';
+    nuc+=`<g class="pt ${isP?'pp':'nn'}" data-kind="${isP?'proton':'neutron'}"><circle cx="${x}" cy="${y}" r="${pr}"/>${isP?`<text x="${x}" y="${y}">+</text>`:''}</g>`}
+  let rings='',els='';
+  sh.forEach((cnt,si)=>{const rr=R0+gap*si;rings+=`<circle class="orbit" r="${rr}"/>`;let g='';
+    for(let j=0;j<cnt;j++){const t=j/cnt*2*Math.PI-Math.PI/2+si*.5,x=(rr*Math.cos(t)).toFixed(1),y=(rr*Math.sin(t)).toFixed(1);
+      g+=`<g class="pt ee" data-kind="electron"><circle cx="${x}" cy="${y}" r="5"/><text x="${x}" y="${y}">−</text></g>`}
+    els+=`<g class="shell" style="--dur:${16+si*8}s">${g}</g>`});
+  const label=o.label||`Model: ${p} protons, ${n} neutrons, ${e} electrons`;
+  return `<svg viewBox="${-O} ${-O} ${2*O} ${2*O}" class="atom${o.click?' click':''}${o.cls?' '+o.cls:''}" role="img" aria-label="${esc(label)}">${rings}${nuc}${els}</svg>`}
+function iso(A,Z,s,cls='',charge=''){return `<span class="iso ${cls}" aria-label="${esc(s)}-${A}: mass number ${A}, atomic number ${Z}${charge?', charge '+charge:''}"><span class="iso-n"><span>${A}</span><span>${Z}</span></span><span class="iso-s">${esc(s)}</span>${charge?`<span class="iso-c">${charge}</span>`:''}</span>`}
+function ptable(hi,btn){let h='<div class="pt-grid">';for(let z=1;z<=36;z++){const[r,c]=pos(z),cls='pt-cell'+(z===hi?' hi':''),inner=`<span class="pz">${z}</span><span class="ps">${SYM[z]}</span>`,st=`grid-row:${r};grid-column:${c}`;
+  h+=btn?`<button class="${cls}" style="${st}" data-z="${z}" aria-label="${NAME[z]}, atomic number ${z}">${inner}</button>`:`<div class="${cls}" style="${st}" title="${NAME[z]}" aria-label="${NAME[z]}, atomic number ${z}">${inner}</div>`}return h+'</div>'}
+
+/* ---------- answer checking, hints, misconceptions ---------- */
+const FL={Z:'Atomic number (Z)',A:'Mass number (A)',p:'Protons',n:'Neutrons',e:'Electrons',name:'Element name',sym:'Symbol'};
+function num(v){const t=String(v==null?'':v).trim();return /^-?\d+$/.test(t)?+t:NaN}
+function elMatch(v,z){const t=String(v||'').trim().toLowerCase();if(!t)return false;return t===NAME[z].toLowerCase()||(z===13&&t==='aluminium')||(z===16&&t==='sulphur')||t===SYM[z].toLowerCase()&&false}
+function symCheck(v,z){const t=String(v||'').trim();if(t===SYM[z])return'ok';if(t.toLowerCase()===SYM[z].toLowerCase())return'case';return'no'}
+function zish(k,v){if(k.has('p'))return['protons',v.p];if(k.has('Z'))return['atomic number',v.Z];if(k.has('e'))return['electrons',v.e];return null}
+function plan(t,k,v){
+  const zk=zish(k,v),T=t==='Z'?'Z':'protons';
+  if(t==='Z'||t==='p'){
+    if(k.has('p')||k.has('Z')){const src=k.has('p')&&t!=='p'?['protons',v.p]:['atomic number',v.Z];return{skill:'Z',h:['What does the atomic number count?','Atomic number equals the number of protons, so they are always the same number.',`${T} = ${src[0]} = ${src[1]}`]}}
+    if(k.has('e'))return{skill:'Z',h:['The atom is neutral. How do its protons and electrons compare?','In a neutral atom, protons = electrons, and atomic number = protons.',`${T} = electrons = ${v.e}`]};
+    if(k.has('A')&&k.has('n'))return{skill:'ZA',h:['Which formula connects mass number and neutrons?','Subtract the number of neutrons from the mass number.',`${T} = A − n = ${v.A} − ${v.n} = ___`]};
+  }
+  if(t==='A'&&zk&&k.has('n'))return{skill:'A',h:['Which particles add up to the mass number?','Add the protons and the neutrons. Electrons are not counted.',`A = protons + neutrons = ${zk[1]} + ${v.n} = ___`]};
+  if(t==='n'&&zk&&k.has('A'))return{skill:'N',h:['Which formula gives the number of neutrons?','Subtract the atomic number (the number of protons) from the mass number.',`n = A − Z = ${v.A} − ${zk[1]} = ___`]};
+  if(t==='e'&&zk)return{skill:'E',h:['The atom is neutral. What must be true about its charges?','In a neutral atom, the number of electrons equals the number of protons.',`electrons = protons = ${zk[1]}`]};
+  if((t==='name'||t==='sym')&&zk)return{skill:'ID',h:['Which number identifies an element?','Find the element whose atomic number equals the number of protons.',`Look for box number ${zk[1]} on the periodic table.`]};
+  return{skill:null,h:['Find another missing value first.','Start with a value you can calculate directly from the clues, then come back to this one.','Work out the atomic number (protons) or the mass number first.']};
+}
+function skillFor(f,given,others,v){return plan(f,new Set(given),v).skill||plan(f,new Set([...given,...others]),v).skill}
+function diagnose(t,a,v){
+  if(Number.isNaN(a))return'';
+  if(t==='A'&&a===v.p+v.n+v.e&&v.e>0)return'Mass number counts protons and neutrons only. Electrons are not included.';
+  if((t==='Z'||t==='p')&&a===v.A&&v.A!==v.Z)return'That is the mass number. Atomic number counts protons only.';
+  if((t==='Z'||t==='p')&&a===v.p+v.n+v.e)return'Atomic number is not the total number of particles. It counts protons only.';
+  if((t==='Z'||t==='p')&&a===v.n&&v.n!==v.Z)return'That is the number of neutrons. Atomic number counts protons.';
+  if(t==='n'&&a===v.A+v.Z)return'Subtract, don’t add: neutrons = mass number − atomic number.';
+  if(t==='n'&&a===v.A)return'The mass number includes the protons too. Subtract the atomic number.';
+  if(t==='e'&&a===v.n&&v.n!==v.e)return'In a neutral atom, electrons equal protons, not neutrons.';
+  if(t==='A'&&a===v.n&&v.n!==v.A)return'That is only the neutrons. Mass number = protons + neutrons.';
+  return'';
+}
+const normKey=f=>(f==='name'||f==='sym')?'id':f;
+
+/* problem widget: fields, check, progressive hints */
+function problem(el,cfg,st){
+  st.vals=st.vals||{};st.ok=st.ok||{};st.hf=st.hf||{};st.checks=st.checks||0;
+  const id=cfg.id;
+  el.innerHTML=`<div class="fields${cfg.compact?' compact':''}">${cfg.fields.map(f=>`<label class="fld" for="${id}-${f}"><span>${FL[f]}</span><input id="${id}-${f}" type="text" ${f==='name'||f==='sym'?`autocomplete="off" spellcheck="false"${f==='sym'?' maxlength="2"':''}`:'inputmode="numeric" autocomplete="off"'} value="${esc(st.vals[f]||'')}"></label>`).join('')}</div>
+  <div class="row"><button class="btn" data-a="chk">Check</button>${cfg.noHints?'<span class="small muted">No hints at this level.</span>':'<button class="btn ghost" data-a="hint">Hint</button>'}</div>
+  <p class="fb" aria-live="polite"></p><p class="hint" aria-live="polite" hidden></p>`;
+  const fb=$('.fb',el),hb=$('.hint',el),inp=f=>$('#'+id+'-'+f,el);
+  const paint=()=>cfg.fields.forEach(f=>{const i=inp(f);i.classList.toggle('ok',!!st.ok[f]);i.disabled=!!st.ok[f]||!!st.solved});
+  paint();
+  if(st.solved){fb.className='fb ok';fb.textContent=cfg.done||'Correct.'}
+  const judge=(f,raw)=>{if(f==='name')return elMatch(raw,cfg.v.Z)?'ok':'no';if(f==='sym')return symCheck(raw,cfg.v.Z);const x=num(raw);return x===cfg.v[f]?'ok':(String(raw).trim()===''?'empty':Number.isNaN(x)?'nan':'no')};
+  function check(){
+    if(st.solved)return;st.checks++;let bad=null,msg='';const res={};
+    cfg.fields.forEach(f=>{if(st.ok[f])return;const raw=inp(f).value;st.vals[f]=raw;const r=judge(f,raw);res[f]=r;
+      if(r==='ok')st.ok[f]=true;
+      else if(!bad){bad=f;
+        if(r==='empty')msg=`Enter a value for ${FL[f].toLowerCase()}.`;
+        else if(r==='nan')msg=`${FL[f]} must be a whole number.`;
+        else if(r==='case')msg='Check the capitalization. A symbol starts with a capital letter, and a second letter is lowercase.';
+        else if(f==='name'&&symCheck(raw,cfg.v.Z)!=='no')msg='Write the element’s full name, not its symbol.';
+        else msg=(cfg.trap&&cfg.trap[f]&&cfg.trap[f][num(raw)])||diagnose(f,num(raw),cfg.v)||`${FL[f]} is not correct yet. ${cfg.noHints?'Recheck your calculation.':'Try again, or use a hint.'}`}});
+    cfg.fields.forEach(f=>inp(f).classList.toggle('no',!!res[f]&&res[f]!=='ok'));
+    if(!bad){st.solved=true;const first=st.checks===1&&!Object.keys(st.hf).length;
+      if(first)cfg.fields.forEach(f=>{const sk=skillFor(f,cfg.known,cfg.fields.filter(g=>g!==f).map(normKey),cfg.v);if(sk)S.mastery[sk]=true});
+      fb.className='fb ok';fb.textContent=cfg.done||'Correct.';hb.hidden=true;save();paint();cfg.onSolve&&cfg.onSolve(first);renderProgress();return}
+    fb.className='fb no';fb.textContent=msg;save();paint();
+  }
+  function hint(){if(st.solved)return;const t=cfg.fields.find(f=>!st.ok[f]);const lv=Math.min(3,(st.hf[t]||0)+1);st.hf[t]=lv;
+    const k=new Set(cfg.known);cfg.fields.forEach(f=>{if(st.ok[f])k.add(normKey(f))});
+    hb.hidden=false;hb.innerHTML=`<b>Hint ${lv} of 3 · ${FL[t]}:</b> ${esc(plan(t,k,cfg.v).h[lv-1])}`;save()}
+  cfg.fields.forEach(f=>{const i=inp(f);i.addEventListener('input',()=>{st.vals[f]=i.value;i.classList.remove('no');save()});i.addEventListener('keydown',e=>{if(e.key==='Enter')check()})});
+  $('[data-a=chk]',el).addEventListener('click',check);const hbn=$('[data-a=hint]',el);if(hbn)hbn.addEventListener('click',hint);
+}
+
+/* multiple-choice widget. options: [text, correct, why] */
+const mcOk=(q,store,key)=>store[key]!=null&&!!q.o[store[key]][1];
+function mc(el,q,key,store,onAnswer){
+  const name='mc-'+key;
+  el.innerHTML=`<fieldset class="mc"><legend>${q.q}</legend>${q.o.map((o,i)=>`<label class="opt"><input type="radio" name="${name}" value="${i}" id="${name}-${i}"><span>${o[0]}</span></label>`).join('')}<div class="row"><button class="btn" data-a="mc">Check answer</button></div><p class="fb" aria-live="polite"></p></fieldset>`;
+  const fb=$('.fb',el);
+  const show=i=>{const o=q.o[i];fb.className='fb '+(o[1]?'ok':'no');fb.textContent=(o[1]?'Correct. ':'Not quite. ')+(o[2]||'')};
+  if(store[key]!=null){const r=$(`input[value="${store[key]}"]`,el);if(r)r.checked=true;show(store[key])}
+  $('[data-a=mc]',el).addEventListener('click',()=>{const r=$('input:checked',el);if(!r){fb.className='fb no';fb.textContent='Choose an answer first.';return}store[key]=+r.value;save();show(+r.value);onAnswer&&onAnswer();renderProgress()});
+}
+
+/* formula panels (M3, M4) */
+function renderFormulas(){$$('.fpanel').forEach(p=>{p.innerHTML=`<div class="row" style="justify-content:space-between"><h3>Formula panel</h3><button class="btn ghost sm" data-fhide aria-pressed="${!S.formulas}">${S.formulas?'Hide formulas':'Show formulas'}</button></div>`+(S.formulas?`<div class="formulas"><div>Atomic number (Z) = protons</div><div>Mass number (A) = protons + neutrons</div><div>Neutrons = mass number − atomic number</div><div>Atomic number = mass number − neutrons</div><div>Neutral atom only: electrons = protons</div></div>`:'<p class="small muted">Formulas hidden for independent practice.</p>')})}
+document.addEventListener('click',e=>{if(e.target.closest('[data-fhide]')){S.formulas=!S.formulas;save();renderFormulas()}});
+
+/* ---------- MODULE 1 ---------- */
+const PINFO={proton:['Proton','Inside the nucleus','+1','about 1 amu','The number of protons is the atomic number. It decides which element the atom is.'],
+  neutron:['Neutron','Inside the nucleus','0 (neutral)','about 1 amu','Neutrons add mass but no charge. Atoms of one element with different numbers of neutrons are isotopes.'],
+  electron:['Electron','Electron cloud, outside the nucleus','−1','about 0 amu (1/1836 of a proton)','Electrons decide the charge. In a neutral atom, electrons = protons.']};
+const ZONES=[['in','Located inside the nucleus',['proton','neutron']],['out','Located outside the nucleus',['electron']],['pos','Has a positive charge',['proton']],['neg','Has a negative charge',['electron']],['zero','Has no electrical charge',['neutron']],['amu','Contributes about 1 amu to the atom’s mass',['proton','neutron']]];
+const M1Q=[
+  {q:'Which subatomic particle is found outside the nucleus?',o:[['Electron',1,'Electrons are in the electron cloud around the nucleus.'],['Proton',0,'Protons are inside the nucleus.'],['Neutron',0,'Neutrons are inside the nucleus.'],['Both protons and neutrons',0,'Protons and neutrons together make up the nucleus.']]},
+  {q:'What is the charge of a neutron?',o:[['+1',0,'+1 is the charge of a proton.'],['0',1,'Neutrons have no electrical charge.'],['−1',0,'−1 is the charge of an electron.'],['+2',0,'No single subatomic particle has a +2 charge.']]},
+  {q:'The nucleus of every atom has an overall charge that is',o:[['positive',1,'The nucleus holds protons (+1) and neutrons (0), so its total charge is positive.'],['negative',0,'Electrons are negative, but they are outside the nucleus.'],['neutral',0,'The nucleus contains protons, so it cannot be neutral.'],['positive or negative, depending on the element',0,'Every nucleus contains at least one proton, so it is always positive.']]}];
+let sel=null;
+function R_m1(){
+  $('#m1atom').innerHTML=atomSVG(3,4,3,{click:true,label:'Lithium-7 model: 3 protons, 4 neutrons, 3 electrons. Select a particle to learn about it.'});
+  $('#chipBank').innerHTML=['proton','neutron','electron'].map(k=>`<button class="chip ${k}" draggable="true" data-chip="${k}" aria-pressed="${sel===k}">${k==='proton'?'+':k==='electron'?'−':'0'} ${k[0].toUpperCase()+k.slice(1)}</button>`).join('');
+  $('#zones').innerHTML=ZONES.map(([k,t])=>{const have=S.m1.zones[k]||[];return `<div class="zone" data-zone="${k}"><span class="zt">${t}</span><div class="zc">${have.map(c=>`<span class="chip ${c}">${c}<button class="x" data-rm="${k},${c}" aria-label="Remove ${c} from ${t}">×</button></span>`).join('')}</div><button class="btn ghost sm place" data-place="${k}">Place here</button></div>`}).join('');
+  $('#sortFb').textContent='';$('#sortFb').className='fb';
+  if(S.m1.sortOk)paintZones();
+  const box=$('#m1mc');box.innerHTML='';M1Q.forEach((q,i)=>{const d=document.createElement('div');box.appendChild(d);mc(d,q,'q'+i,S.m1.mc)});
+}
+function addToZone(z,k){const a=S.m1.zones[z]=S.m1.zones[z]||[];if(!a.includes(k))a.push(k);S.m1.sortOk=false;save();R_m1zones()}
+function R_m1zones(){const keep=sel;R_m1();sel=keep}
+function paintZones(){let right=0;ZONES.forEach(([k,,ans])=>{const have=(S.m1.zones[k]||[]).slice().sort().join(),ok=have===ans.slice().sort().join();if(ok)right++;const z=$(`[data-zone="${k}"]`);z.classList.toggle('ok',ok);z.classList.toggle('no',!ok)});return right}
+$('#m1atom').addEventListener('click',e=>{const g=e.target.closest('[data-kind]');if(!g)return;const d=PINFO[g.dataset.kind];
+  $('#pinfoTitle').textContent=d[0];$('#pinfo').innerHTML=`<dl class="pinfo"><dt>Location</dt><dd>${d[1]}</dd><dt>Charge</dt><dd>${d[2]}</dd><dt>Relative mass</dt><dd>${d[3]}</dd></dl><p style="margin-top:8px">${d[4]}</p>`});
+$('#chipBank').addEventListener('click',e=>{const c=e.target.closest('[data-chip]');if(!c)return;sel=sel===c.dataset.chip?null:c.dataset.chip;$$('#chipBank .chip').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.chip===sel)))});
+$('#chipBank').addEventListener('dragstart',e=>{const c=e.target.closest('[data-chip]');if(c)e.dataTransfer.setData('text/plain',c.dataset.chip)});
+$('#zones').addEventListener('dragover',e=>{const z=e.target.closest('.zone');if(z){e.preventDefault();z.classList.add('over')}});
+$('#zones').addEventListener('dragleave',e=>{const z=e.target.closest('.zone');if(z)z.classList.remove('over')});
+$('#zones').addEventListener('drop',e=>{const z=e.target.closest('.zone');if(!z)return;e.preventDefault();const k=e.dataTransfer.getData('text/plain');if(PINFO[k])addToZone(z.dataset.zone,k)});
+$('#zones').addEventListener('click',e=>{const rm=e.target.closest('[data-rm]');if(rm){const[z,c]=rm.dataset.rm.split(',');S.m1.zones[z]=(S.m1.zones[z]||[]).filter(x=>x!==c);S.m1.sortOk=false;save();R_m1zones();return}
+  const pl=e.target.closest('[data-place]');if(pl){if(!sel){$('#sortFb').className='fb no';$('#sortFb').textContent='Select a particle first, then press Place here.';return}addToZone(pl.dataset.place,sel)}});
+$('#sortCheck').addEventListener('click',()=>{const right=paintZones();const fb=$('#sortFb');
+  if(right===ZONES.length){S.m1.sortOk=true;fb.className='fb ok';fb.textContent='All six statements are sorted correctly.'}
+  else{S.m1.sortOk=false;fb.className='fb no';fb.textContent=`${right} of 6 statements are correct. Red boxes are missing a particle or have one that does not belong. Remember that some statements fit two particles.`}
+  save();renderProgress()});
+
+/* ---------- MODULE 2 ---------- */
+const INVQ={
+  A:{q:'What happened to the identity of the atom when you changed the number of protons?',o:[['It became a different element (hydrogen became helium).',1,'Changing the number of protons changes the element.'],['It stayed hydrogen but got heavier.',0,'Hydrogen always has exactly 1 proton. With 2 protons it is helium.'],['It became an ion.',0,'You added an electron too, so the charge stayed 0. The element changed.'],['Nothing changed.',0,'Look at the element name and the highlighted box on the periodic table.']]},
+  B:{q:'Did the identity of the element change when you added a neutron?',o:[['No. It is still carbon, now the isotope carbon-13.',1,'Changing the number of neutrons changes the isotope, not the element.'],['Yes. It became nitrogen.',0,'Nitrogen has 7 protons. You changed neutrons, so the protons stayed at 6.'],['Yes. It became an ion.',0,'Neutrons have no charge, so the charge is still 0.'],['No, and the mass number stayed 12.',0,'The mass number went up by 1, from 12 to 13.']]},
+  C:{q:'What did removing one electron change?',o:[['The charge (now +1), but not the element.',1,'Electrons change the charge. The 11 protons still make it sodium.'],['It became neon, which has 10 electrons.',0,'Neon has 10 protons. This particle still has 11 protons, so it is sodium.'],['The mass number went down by 1.',0,'Electrons are not counted in the mass number. It is still 23.'],['Nothing changed.',0,'Check the net charge readout.']]}};
+const INV=[
+  {k:'A',title:'A · Changing protons',start:[1,0,1],startTxt:'Start: hydrogen-1 (1 proton, 0 neutrons, 1 electron)',steps:[['A1','Add one proton and one electron.'],['A2','Add neutrons until you have helium-4.']]},
+  {k:'B',title:'B · Changing neutrons',start:[6,6,6],startTxt:'Start: carbon-12 (6 protons, 6 neutrons, 6 electrons)',steps:[['B1','Add one neutron.']]},
+  {k:'C',title:'C · Changing electrons (extension)',start:[11,12,11],startTxt:'Start: sodium-23 (11 protons, 12 neutrons, 11 electrons)',steps:[['C1','Remove one electron.']]}];
+const INVNOTE={A1:'You built helium-2: 2 protons, 0 neutrons, 2 electrons. Adding a proton changed the element from hydrogen to helium. Helium-2 is extremely unstable and falls apart almost instantly. Now add neutrons to build helium-4, the common stable isotope.',
+  A2:'Helium-4: 2 protons, 2 neutrons, 2 electrons. This is the stable helium in balloons. Same element as helium-2, different isotope.',
+  B1:'Carbon-13. It is still carbon because it still has 6 protons. The extra neutron raised the mass number from 12 to 13. Carbon-13 is a stable isotope.',
+  C1:'Sodium ion (Na⁺): 11 protons but only 10 electrons, so the net charge is +1. It is still sodium because the protons did not change. Electrons equal protons only in neutral atoms.'};
+const LIM={p:36,n:50,e:40};
+function stab(p,n){if(!p)return['no','Not an element: an atom needs at least 1 proton'];const A=p+n;
+  if(p===2&&n===0)return['warn','Extremely unstable: falls apart almost instantly'];
+  if((STABLE[p]||[]).includes(A))return['ok','Stable isotope'];
+  if((RADIO[p]||[]).includes(A))return['warn','Radioactive isotope'];
+  return['warn','Unstable: not a stable combination of protons and neutrons']}
+function R_m2(){
+  const{p,n,e}=S.m2,A=p+n,ch=p-e;
+  $('#cp').textContent=p;$('#cn').textContent=n;$('#ce').textContent=e;
+  $('#neutralTog').checked=!!S.m2.neutral;
+  $('#bAtom').innerHTML=atomSVG(p,n,e);
+  $('#bTile').innerHTML=p?`<span class="z">${p}</span><span class="s">${SYM[p]}</span><span class="n">${NAME[p]}</span>`:'<span class="s">?</span>';
+  $('#bName').textContent=p?NAME[p]+(ch?` ion`:''):'No element';
+  const chs=ch===0?'':(Math.abs(ch)>1?Math.abs(ch):'')+(ch>0?'+':'−');
+  $('#bIso').innerHTML=p?`${NAME[p]}-${A} &nbsp; ${iso(A,p,SYM[p],'lg',chs)}`:'<span class="muted">Add a proton to make an element.</span>';
+  const[sk,st]=stab(p,n);$('#bStab').innerHTML=`<span class="badge ${sk}">${st}</span>`;
+  const chTxt=ch===0?'0 (neutral atom)':(ch>0?'+'+ch+' (positive ion)':'−'+(-ch)+' (negative ion)');
+  $('#bRead').innerHTML=[['Element',p?NAME[p]:'—'],['Symbol',p?SYM[p]:'—'],['Atomic number',p],['Mass number',A],['Protons',p],['Neutrons',n],['Electrons',e],['Net charge',chTxt]].map(([k,v])=>`<div class="ro"><span>${k}</span><b>${v}</b></div>`).join('');
+  $('#bMass').textContent=p?`Average atomic mass on the periodic table: ${MASS[p]} u. That is a weighted average of all naturally occurring isotopes, so it is not the mass number of this atom (${A}).`:'';
+  $('#bPT').innerHTML=ptable(p);
+  $('#invs').innerHTML=INV.map(v=>{const active=S.m2.inv===v.k,done=v.steps.every(s=>S.m2.step[s[0]]);
+    return `<div class="card flat"><div class="row" style="justify-content:space-between"><h3>${v.title}</h3>${done?'<span class="badge ok">Done</span>':active?'<span class="badge warn">In progress</span>':''}</div>
+    <p class="small">${v.startTxt}</p><button class="btn ghost sm" data-inv="${v.k}" style="justify-self:start">${active||done?'Restart':'Start'} investigation</button>
+    <ul class="steps">${v.steps.map(s=>`<li class="${S.m2.step[s[0]]?'done':''}">${s[1]}</li>`).join('')}</ul>
+    ${v.steps.filter(s=>S.m2.step[s[0]]).map(s=>`<p class="note small">${INVNOTE[s[0]]}</p>`).join('')}
+    ${done?`<div data-invq="${v.k}"></div>`:''}</div>`}).join('');
+  INV.forEach(v=>{const el=$(`[data-invq="${v.k}"]`);if(el)mc(el,INVQ[v.k],v.k,S.m2.mc)});
+}
+function setAtom(p,n,e){S.m2.p=p;S.m2.n=n;S.m2.e=e}
+function invCheck(){const{p,n,e,inv,step}=S.m2;if(!inv)return;
+  if(inv==='A'){if(!step.A1&&p===2&&n===0&&e===2)step.A1=true;if(step.A1&&!step.A2&&p===2&&n===2&&e===2)step.A2=true}
+  if(inv==='B'&&!step.B1&&p===6&&n===7&&e===6)step.B1=true;
+  if(inv==='C'&&!step.C1&&p===11&&n===12&&e===10)step.C1=true}
+$('.ctrls').addEventListener('click',e=>{const b=e.target.closest('[data-d]');if(!b)return;const[k,d]=b.dataset.d.split(','),dd=+d,msg=$('#bMsg');msg.textContent='';msg.className='fb';
+  if(k==='e'&&S.m2.neutral){msg.className='fb no';msg.textContent='Turn off “Keep the atom neutral” to change electrons on their own.';return}
+  const nv=S.m2[k]+dd;if(nv<0||nv>LIM[k]){msg.className='fb no';msg.textContent=nv<0?`You can’t have fewer than 0 ${k==='p'?'protons':k==='n'?'neutrons':'electrons'}.`:`This model stops at ${LIM[k]}.`;return}
+  S.m2[k]=nv;if(k==='p'&&S.m2.neutral)S.m2.e=Math.min(LIM.e,S.m2.p);
+  invCheck();save();R_m2();renderProgress()});
+$('#neutralTog').addEventListener('change',e=>{S.m2.neutral=e.target.checked;if(S.m2.neutral)S.m2.e=S.m2.p;invCheck();save();R_m2()});
+$('#invs').addEventListener('click',e=>{const b=e.target.closest('[data-inv]');if(!b)return;const v=INV.find(x=>x.k===b.dataset.inv);S.m2.inv=v.k;v.steps.forEach(s=>delete S.m2.step[s[0]]);delete S.m2.mc[v.k];setAtom(...v.start);if(v.k==='C')S.m2.neutral=false;save();R_m2();renderProgress();$('#bAtom').scrollIntoView({behavior:S.motion?'smooth':'auto',block:'center'})});
+
+/* ---------- MODULE 3 ---------- */
+const P3=[
+  {id:'A',title:'Part A · Atomic number',teach:'Atomic number (Z) = number of protons',atom:[8,8,8],prompt:'This atom has 8 protons, 8 neutrons, and 8 electrons. What is its atomic number?',fields:['Z'],known:['p','n','e'],v:vals(8,16),done:'Correct. Z = 8, so this atom is oxygen. The atomic number identifies the element because every atom of the same element has the same number of protons.'},
+  {id:'B',title:'Part B · Mass number',teach:'Mass number (A) = protons + neutrons',atom:[8,9,8],prompt:'This oxygen atom has 8 protons, 9 neutrons, and 8 electrons. What is its mass number?',fields:['A'],known:['p','n','e'],v:vals(8,17),done:'Correct. 8 + 9 = 17. This is the isotope oxygen-17.'},
+  {id:'C',title:'Part C · Calculate neutrons',teach:'Neutrons = mass number − atomic number',info:[['Element','Sodium'],['Atomic number','11'],['Mass number','23']],prompt:'How many neutrons are in this atom?',fields:['n'],known:['Z','A'],v:vals(11,23),done:'Correct. 23 − 11 = 12 neutrons.'},
+  {id:'D',title:'Part D · Atomic number from mass number and neutrons',teach:'Atomic number = mass number − neutrons',info:[['Mass number','27'],['Neutrons','14']],prompt:'What is the atomic number? Which element is it?',fields:['Z','name'],known:['A','n'],v:vals(13,27),done:'Correct. 27 − 14 = 13. Element 13 is aluminum (Al).'},
+  {id:'E1',title:'Part E · Atomic number from protons',teach:'Neutral atom: atomic number = protons = electrons',info:[['Protons','16'],['Charge','0 (neutral atom)']],prompt:'What is the atomic number?',fields:['Z'],known:['p'],v:vals(16,32),done:'Correct. Z = 16. This is sulfur.'},
+  {id:'E2',title:'Part E · Atomic number from electrons',info:[['Electrons','19'],['Charge','0 (neutral atom)']],prompt:'What is the atomic number? Which element is it?',fields:['Z','name'],known:['e'],v:vals(19,39),done:'Correct. In a neutral atom electrons = protons, so Z = 19. This is potassium.'},
+  {id:'E3',title:'Part E · Watch out: an ion',info:[['Protons','11'],['Electrons','10'],['Charge','+1 (an ion)']],prompt:'This particle is an ion, not a neutral atom. What is its atomic number?',fields:['Z'],known:['p','e'],v:{Z:11,A:23,p:11,n:12,e:10},trap:{Z:{10:'This is an ion, so electrons do not equal protons. Atomic number always equals the number of protons.'}},done:'Correct. Z = 11 (sodium). Electrons equal protons only in neutral atoms, so for an ion you must count protons.'}];
+function R_m3(){
+  const box=$('#m3parts');box.innerHTML=P3.map(p=>`<div class="card"><div class="row" style="justify-content:space-between"><h3>${p.title}</h3><span data-ok="${p.id}"></span></div>${p.teach?`<p class="note"><b>${p.teach}</b></p>`:''}
+    ${p.atom?`<div class="grid2" style="align-items:center"><div class="stage">${atomSVG(...p.atom)}</div><div class="legend"><span><i class="dot p"></i>${p.atom[0]} protons</span><span><i class="dot n"></i>${p.atom[1]} neutrons</span><span><i class="dot e"></i>${p.atom[2]} electrons</span></div></div>`:''}
+    ${p.info?`<div class="given-list">${p.info.map(([k,v])=>`<span class="gv">${k}: <b>${v}</b></span>`).join('')}</div>`:''}
+    <p><b>${p.prompt}</b></p><div data-p="${p.id}"></div></div>`).join('');
+  P3.forEach(p=>{const st=S.m3.st[p.id]=S.m3.st[p.id]||{};problem($(`[data-p="${p.id}"]`),{id:'m3'+p.id,fields:p.fields,known:p.known,v:p.v,done:p.done,trap:p.trap,onSolve:()=>mark(p.id)},st);mark(p.id)});
+  function mark(id){const s=S.m3.st[id];$(`[data-ok="${id}"]`).innerHTML=s&&s.solved?'<span class="badge ok">Solved</span>':''}
+  renderFormulas();
+}
+
+/* ---------- MODULE 4 ---------- */
+const COLS=['Z','A','p','n','e'];
+const T4=[{z:6,A:12,g:['Z','A']},{z:8,A:16,g:['Z','p','n']},{z:11,A:23,g:['A','p','e']},{z:12,A:24,g:['Z','A']},{z:13,A:27,g:['A','n']},{z:17,A:35,g:['Z','A']},{z:20,A:40,g:['A','p','e']},{z:19,A:39,g:['Z','p','n']},{z:26,A:56,g:['A','p','e']},{z:10,A:20,g:['Z','A']}];
+const LV=[[1,'Beginning','You get the atomic number and mass number. Find protons, neutrons, and electrons.'],[2,'Developing','You get different pairs of values. Find the missing ones.'],[3,'Approaching','Find the atomic number and mass number from particle counts.'],[4,'Proficient','Multistep problems. Identify the element. No hints.']];
+const SKILLS=[['Z','Atomic number from protons or electrons'],['A','Mass number = protons + neutrons'],['N','Neutrons = mass number − atomic number'],['ZA','Atomic number = mass number − neutrons'],['E','Electrons in a neutral atom'],['ID','Identify an element from its atomic number'],['NOT','Read and write isotope notation']];
+function renderT4(){
+  $('#t4body').innerHTML=T4.map((r,ri)=>{const v=vals(r.z,r.A),done=S.m4.rows[ri];
+    return `<tr class="${done?'done':''}"><th scope="row">${NAME[r.z]}</th>${COLS.map(c=>{if(r.g.includes(c))return `<td class="given">${v[c]}</td>`;if(S.m4.cells[ri+c])return `<td class="solved">${v[c]}</td>`;
+      return `<td><input class="cell" id="t4-${ri}-${c}" data-k="${ri}${c}" type="text" inputmode="numeric" autocomplete="off" aria-label="${NAME[r.z]}: ${FL[c]}" value="${esc(S.m4.vals[ri+c]||'')}"></td>`}).join('')}
+      <td>${done?'<span class="badge ok">Done</span>':`<button class="btn sm" data-row="${ri}">Check row</button>`}</td></tr>
+      <tr class="hintrow" ${S.m4.msg[ri]?'':'hidden'}><td colspan="7">${S.m4.msg[ri]||''}</td></tr>`}).join('')}
+function checkRow(ri){
+  const r=T4[ri],v=vals(r.z,r.A),blanks=COLS.filter(c=>!r.g.includes(c)&&!S.m4.cells[ri+c]);
+  const first=!S.m4.tries[ri];S.m4.tries[ri]=(S.m4.tries[ri]||0)+1;const wrong=[];
+  blanks.forEach(c=>{const i=$(`#t4-${ri}-${c}`),raw=i?i.value:'';S.m4.vals[ri+c]=raw;if(num(raw)===v[c])S.m4.cells[ri+c]=true;else wrong.push([c,raw])});
+  if(!wrong.length){S.m4.rows[ri]=true;S.m4.msg[ri]='';if(first)blanks.forEach(c=>{const sk=skillFor(c,r.g,blanks.filter(x=>x!==c),v);if(sk)S.mastery[sk]=true})}
+  else{const[c,raw]=wrong[0],k=new Set([...r.g,...COLS.filter(x=>S.m4.cells[ri+x])]),lv=Math.min(3,(S.m4.hl[ri]||0)+1);S.m4.hl[ri]=lv;
+    const d=String(raw).trim()===''?`Fill in the ${FL[c].toLowerCase()} for ${NAME[r.z].toLowerCase()}.`:(diagnose(c,num(raw),v)||`${NAME[r.z]}: ${FL[c].toLowerCase()} is not correct yet.`);
+    S.m4.msg[ri]=`<b>${esc(d)}</b> Hint ${lv}: ${esc(plan(c,k,v).h[lv-1])}`}
+  save();renderT4();renderMastery();renderProgress();
+  const nb=$(`[data-row="${ri}"]`);if(nb){const fi=$(`#t4-${ri}-${wrong.length?wrong[0][0]:''}`);(fi||nb).focus()}
+}
+$('#t4body').addEventListener('click',e=>{const b=e.target.closest('[data-row]');if(b)checkRow(+b.dataset.row)});
+$('#t4body').addEventListener('input',e=>{const i=e.target.closest('[data-k]');if(i){S.m4.vals[i.dataset.k]=i.value;save()}});
+$('#t4body').addEventListener('keydown',e=>{const i=e.target.closest('[data-k]');if(i&&e.key==='Enter')checkRow(parseInt(i.dataset.k,10))});
+function clueText(g,v){return 'A neutral atom has '+list(g.map(k=>({Z:`atomic number ${v.Z}`,A:`mass number ${v.A}`,p:`${v.p} protons`,n:`${v.n} neutrons`,e:`${v.e} electrons`})[k]))+'.'}
+function genLevel(l){const pool=l<=2?ISO.filter(i=>i.z<=20):ISO;const s=pick(pool);let g,ask;
+  if(l===1){g=['Z','A'];ask=['p','n','e']}
+  else if(l===2)[g,ask]=pick([[['p','n'],['Z','A','e']],[['A','e'],['Z','p','n']],[['Z','n'],['A','p','e']],[['A','p'],['Z','n','e']]]);
+  else if(l===3)[g,ask]=pick([[['p','n'],['Z','A']],[['n','e'],['Z','A']],[['A','n'],['Z','p']]]);
+  else[g,ask]=pick([[['A','n'],['Z','e','name']],[['n','e'],['Z','A','name']],[['A','e'],['Z','n','name']]]);
+  return{z:s.z,A:s.A,g,ask,l,uid:Date.now()%100000}}
+function R_m4lvl(){
+  const l=S.m4.lvl;$('#levels').innerHTML=LV.map(([n,t])=>`<button class="btn ghost sm" data-lvl="${n}" aria-pressed="${n===l}">Level ${n} · ${t}</button>`).join('');
+  $('#lvlDesc').textContent=LV[l-1][2];
+  if(!S.m4.prob||S.m4.prob.l!==l){S.m4.prob=genLevel(l);S.m4.pst={};save()}
+  const P=S.m4.prob,v=vals(P.z,P.A);const box=$('#lvlProb');box.innerHTML=`<p><b>${clueText(P.g,v)}</b></p><div></div>`;
+  problem($('div',box),{id:'lv'+P.uid,fields:P.ask,known:P.g,v,noHints:l===4,done:`Correct. This is ${NAME[P.z].toLowerCase()}-${P.A}.`,onSolve:()=>{S.m4.lvDone[l]=(S.m4.lvDone[l]||0)+1;save();renderMastery();$('#lvlCount').textContent=`Solved at this level: ${S.m4.lvDone[l]}`}},S.m4.pst);
+  $('#lvlCount').textContent=`Solved at this level: ${S.m4.lvDone[l]||0}`;
+}
+$('#levels').addEventListener('click',e=>{const b=e.target.closest('[data-lvl]');if(!b)return;S.m4.lvl=+b.dataset.lvl;S.m4.prob=null;save();R_m4lvl()});
+$('#lvlNew').addEventListener('click',()=>{S.m4.prob=genLevel(S.m4.lvl);S.m4.pst={};save();R_m4lvl();const f=$('#lvlProb input');if(f)f.focus()});
+function renderMastery(){$('#mastery').innerHTML='<ul>'+SKILLS.map(([k,t])=>`<li><span class="badge ${S.mastery[k]?'ok':''}">${S.mastery[k]?'✓ Shown':'Not yet'}</span>${t}</li>`).join('')+'</ul>'}
+function R_m4(){renderT4();R_m4lvl();renderMastery();renderFormulas()}
+
+/* ---------- MODULE 5 ---------- */
+const CASES=[{z:12,A:24,g:['p','n','e'],ask:['Z','A','name','sym']},{z:15,A:31,g:['A','n'],ask:['p','e','Z','name']},{z:18,A:40,g:['e','n'],ask:['p','Z','A','name']},{z:17,A:37,g:['Z','A'],ask:['p','n','e','name']},{z:21,A:45,g:['n','A'],ask:['Z','p','e','name'],adv:true}];
+const GL={Z:'Atomic number',A:'Mass number',p:'Protons',n:'Neutrons',e:'Electrons'};
+function genCase(){const s=pick(ISO);const[g,ask]=pick([[['p','n','e'],['Z','A','name','sym']],[['A','n'],['p','e','Z','name']],[['e','n'],['p','Z','A','name']],[['Z','A'],['p','n','e','name']],[['A','e'],['n','Z','name','sym']]]);return{z:s.z,A:s.A,g,ask,uid:Date.now()%100000}}
+function R_m5(){
+  const i=S.m5.i;
+  $('#cases').innerHTML=CASES.map((c,k)=>{const s=S.m5.st['c'+k];return `<button class="btn ghost sm" data-case="${k}" aria-current="${i===k}">Case ${k+1}${c.adv?' · Advanced':''}${s&&s.solved?' ✓':''}</button>`}).join('')+`<button class="btn ghost sm" data-case="r" aria-current="${i==='r'}">Random case</button>`;
+  let C,key;if(i==='r'){if(!S.m5.rand)S.m5.rand=genCase();C=S.m5.rand;key='r'+C.uid}else{C=CASES[i];key='c'+i}
+  const v=vals(C.z,C.A),st=S.m5.st[key]=S.m5.st[key]||{};
+  $('#casefile').innerHTML=`<div class="row" style="justify-content:space-between"><h3>${i==='r'?'Random case':'Case '+(i+1)}: an unknown neutral atom</h3>${i==='r'?'<button class="btn ghost sm" id="newCase">New random case</button>':''}</div>
+    <div class="given-list">${C.g.map(k=>`<span class="gv">${GL[k]}: <b>${v[k]}</b></span>`).join('')}</div>
+    <p class="muted small">Determine: ${list(C.ask.map(f=>FL[f].toLowerCase()))}.</p>
+    <div id="caseProb"></div><div id="caseReveal"></div>`;
+  const reveal=anim=>{$('#caseReveal').innerHTML=`<div class="revealbox"><div class="stage">${atomSVG(v.p,v.n,v.e,{cls:anim&&S.motion?'reveal':'',label:`${NAME[C.z]}-${C.A}: ${v.p} protons, ${v.n} neutrons, ${v.e} electrons`})}</div><div class="stack"><p class="eyebrow">Mystery solved</p><div class="idcard"><div class="tile"><span class="z">${C.z}</span><span class="s">${SYM[C.z]}</span><span class="n">${NAME[C.z]}</span></div>${iso(C.A,C.z,SYM[C.z],'lg')}</div><p>${NAME[C.z]}-${C.A}: ${v.p} protons, ${v.n} neutrons, ${v.e} electrons.</p></div></div>`};
+  problem($('#caseProb'),{id:'case'+key,fields:C.ask,known:C.g,v,done:`Case closed. The mystery element is ${NAME[C.z].toLowerCase()}.`,onSolve:()=>{reveal(true);if(i!=='r')R_m5cases()}},st);
+  if(st.solved)reveal(false);
+  const nc=$('#newCase');if(nc)nc.addEventListener('click',()=>{S.m5.rand=genCase();save();R_m5()});
+  $('#m5PT').innerHTML=ptable(0);
+}
+function R_m5cases(){const i=S.m5.i;$$('#cases [data-case]').forEach(b=>{const k=b.dataset.case;if(k==='r')return;const s=S.m5.st['c'+k];b.textContent=`Case ${+k+1}${CASES[k].adv?' · Advanced':''}${s&&s.solved?' ✓':''}`})}
+$('#cases').addEventListener('click',e=>{const b=e.target.closest('[data-case]');if(!b)return;S.m5.i=b.dataset.case==='r'?'r':+b.dataset.case;save();R_m5()});
+
+/* ---------- MODULE 6 ---------- */
+const M6A=[[23,11],[16,8],[27,13],[40,20],[35,17]];
+const C1Q=['Atomic number','Mass number','Protons','Neutrons','Electrons'],C1A=[0,2,4],C2A=[1,3];
+function R_m6(){
+  $('#isoHero').innerHTML=iso(14,6,'C','huge');
+  $('#m6a').innerHTML=M6A.map(([A,z],k)=>`<div class="arow"><div>${iso(A,z,SYM[z],'lg')}</div><div data-a6="${k}"></div></div>`).join('');
+  M6A.forEach(([A,z],k)=>{const st=S.m6.st['a'+k]=S.m6.st['a'+k]||{};problem($(`[data-a6="${k}"]`),{id:'m6a'+k,compact:true,fields:['p','n','e'],known:['A','Z'],v:vals(z,A),done:`Correct: ${vals(z,A).p} protons, ${vals(z,A).n} neutrons, ${vals(z,A).e} electrons.`,onSolve:first=>{if(first){S.m6.aFirst=(S.m6.aFirst||0)+1;if(S.m6.aFirst>=3)S.mastery.NOT=true}save()}},st)});
+  const bst=S.m6.st.b=S.m6.st.b||{};
+  problem($('#m6b'),{id:'m6b',fields:['Z','A','name'],known:['p','n'],v:vals(15,31),done:'Correct. Z = 15, A = 15 + 16 = 31, and element 15 is phosphorus. Now write the isotope notation.',onSolve:()=>R_m6build()},bst);
+  R_m6build();
+  $('#cmp').innerHTML=[12,13,14].map(A=>`<div class="card flat"><div class="stage">${atomSVG(6,A-6,6,{label:`Carbon-${A}: 6 protons, ${A-6} neutrons, 6 electrons`})}</div><div>${iso(A,6,'C','lg')}</div><p class="small">Carbon-${A}${A===14?' (radioactive)':' (stable)'}</p></div>`).join('');
+  $('#cmpT').innerHTML=[12,13,14].map(A=>`<tr><th scope="row">Carbon-${A}</th><td>6</td><td>${A}</td><td>6</td><td>${A-6}</td><td>6</td></tr>`).join('');
+  $('#m6c').innerHTML=[['c1','What is the same in all three atoms? Select every answer that applies.'],['c2','What is different? Select every answer that applies.']].map(([k,q])=>`<fieldset class="mc"><legend>${q}</legend><div class="checks">${C1Q.map((t,i)=>`<label><input type="checkbox" data-${k}="${i}" ${S.m6[k].includes(i)?'checked':''}>${t}</label>`).join('')}</div><div class="row"><button class="btn" data-cchk="${k}">Check</button></div><p class="fb" id="fb-${k}" aria-live="polite"></p></fieldset>`).join('')+'<p class="note" id="cSum" hidden>Isotopes of the same element have the same number of protons (and so the same atomic number) but different numbers of neutrons, which gives them different mass numbers.</p>';
+  ['c1','c2'].forEach(k=>{if(S.m6[k].length)showC(k)});
+}
+function showC(k){const ans=k==='c1'?C1A:C2A,have=S.m6[k].slice().sort(),ok=have.join()===ans.join(),fb=$('#fb-'+k);
+  S.m6[k==='c1'?'cOk1':'cOk2']=ok;fb.className='fb '+(ok?'ok':'no');
+  fb.textContent=ok?(k==='c1'?'Correct. All three have 6 protons, so atomic number 6, and 6 electrons because they are neutral.':'Correct. The neutrons (6, 7, 8) differ, so the mass numbers (12, 13, 14) differ.'):'Not quite. Compare each column in the table above. '+(k==='c1'?'Which numbers are identical in every row?':'Which numbers change from row to row?');
+  $('#cSum').hidden=!(S.m6.cOk1&&S.m6.cOk2)}
+$('#m6c').addEventListener('click',e=>{const b=e.target.closest('[data-cchk]');if(!b)return;const k=b.dataset.cchk;S.m6[k]=$$(`[data-${k}]`).filter(x=>x.checked).map(x=>+x.dataset[k]);save();showC(k);save();renderProgress()});
+function R_m6build(){const box=$('#m6bBuild'),solved=S.m6.st.b&&S.m6.st.b.solved;
+  if(!solved){box.innerHTML='<p class="small muted">Solve the three values above to unlock the notation builder.</p>';return}
+  box.innerHTML=`<p><b>Build the isotope notation.</b> Type each number in its position.</p>
+  <div class="isoBuild"><input id="nbA" type="text" inputmode="numeric" aria-label="Upper left: mass number" placeholder="A" value="${esc(S.m6.nb.A||'')}"><input class="s" id="nbS" type="text" maxlength="2" aria-label="Element symbol" placeholder="X" value="${esc(S.m6.nb.S||'')}"><input id="nbZ" type="text" inputmode="numeric" aria-label="Lower left: atomic number" placeholder="Z" value="${esc(S.m6.nb.Z||'')}"></div>
+  <div class="row"><button class="btn" id="nbChk">Check notation</button></div><p class="fb" id="nbFb" aria-live="polite"></p>`;
+  if(S.m6.bNot){['nbA','nbZ','nbS'].forEach(i=>{$('#'+i).disabled=true;$('#'+i).classList.add('ok')});$('#nbFb').className='fb ok';$('#nbFb').innerHTML='Correct: '+iso(31,15,'P','lg')+' phosphorus-31.'}
+  ['A','Z','S'].forEach(k=>$('#nb'+k).addEventListener('input',e=>{S.m6.nb[k]=e.target.value;save()}));
+  $('#nbChk').addEventListener('click',()=>{if(S.m6.bNot)return;S.m6.nbTries=(S.m6.nbTries||0)+1;const a=num($('#nbA').value),z=num($('#nbZ').value),s=$('#nbS').value,fb=$('#nbFb');let m='';
+    if(a===15&&z===31)m='The numbers are swapped. Mass number goes on top; atomic number goes on the bottom.';
+    else if(a!==31)m=a===46?'Mass number does not include the atomic number twice. A = protons + neutrons.':'Check the mass number (upper left): protons + neutrons.';
+    else if(z!==15)m='Check the atomic number (lower left): the number of protons.';
+    else if(symCheck(s,15)==='case')m='Check the capitalization of the symbol.';
+    else if(symCheck(s,15)!=='ok')m='Check the symbol. Find element 15 on the periodic table.';
+    if(m){fb.className='fb no';fb.textContent=m;return}
+    S.m6.bNot=true;if(S.m6.nbTries===1)S.mastery.NOT=true;save();R_m6build();renderProgress()})}
+
+/* ---------- FINAL ASSESSMENT ---------- */
+const FIN={
+ A:[
+  {t:'mc',q:'Which particle determines the identity of an element?',o:[['Protons',1],['Neutrons',0],['Electrons',0],['Protons and neutrons together',0]],exp:'The number of protons (the atomic number) decides the element. Neutrons change the isotope; electrons change the charge.'},
+  {t:'mc',q:'An atom of silicon-29 differs from an atom of silicon-28 by having one more',o:[['neutron',1],['proton',0],['electron',0],['energy level',0]],exp:'Both are silicon, so both have 14 protons. The mass number is 1 higher, so silicon-29 has one more neutron.'},
+  {t:'mc',q:'The mass number of an atom equals the total number of its',o:[['protons and neutrons',1],['protons and electrons',0],['protons only',0],['protons, neutrons, and electrons',0]],exp:'Mass number = protons + neutrons. Electrons have almost no mass and are not counted.'},
+  {t:'mc',q:'What is the total charge of the nucleus of a nitrogen atom?',o:[['+7',1],['+14',0],['0',0],['−7',0]],exp:'Nitrogen has atomic number 7, so its nucleus has 7 protons (+7). Neutrons add no charge.'},
+  {t:'mc',q:'The Periodic Table lists the atomic mass of bromine as 79.904 u, but no bromine atom has a mass number of 79.904. Why?',o:[['It is a weighted average of naturally occurring isotopes, such as bromine-79 and bromine-81.',1],['Electrons add a fraction to the mass number.',0],['Some bromine protons have only part of a mass unit.',0],['The mass number of bromine changes with temperature.',0]],exp:'Mass number is a whole number for one isotope. Atomic mass is the weighted average of all naturally occurring isotopes.'},
+  {t:'num',q:'An atom contains 22 protons and 26 neutrons. What is its mass number?',ans:48,exp:'A = protons + neutrons = 22 + 26 = 48 (titanium-48).'},
+  {t:'num',q:'An atom has a mass number of 63 and contains 34 neutrons. What is its atomic number?',ans:29,exp:'Z = A − n = 63 − 34 = 29 (copper).'},
+  {t:'num',q:'How many neutrons are in an atom of zinc-66? (Zinc’s atomic number is 30.)',ans:36,exp:'n = A − Z = 66 − 30 = 36.'},
+  {t:'num',q:'A neutral atom contains 9 electrons and 10 neutrons. What is its mass number?',ans:19,exp:'Neutral atom: protons = electrons = 9. A = 9 + 10 = 19 (fluorine-19).'},
+  {t:'num',q:'An atom has atomic number 25 and mass number 55. How many neutrons does it have?',ans:30,exp:'n = A − Z = 55 − 25 = 30 (manganese-55).'},
+  {t:'row',z:5,A:11,g:['A','p'],fields:['name','Z','n','e'],exp:'Protons = 5, so Z = 5 and the element is boron. n = 11 − 5 = 6. Neutral: electrons = 5.'},
+  {t:'row',z:34,A:80,g:['Z','A'],fields:['name','p','n','e'],exp:'Z = 34 is selenium. Protons = 34, neutrons = 80 − 34 = 46, electrons = 34.'},
+  {t:'row',z:24,A:52,g:['A','n','e'],fields:['name','Z','p'],exp:'Neutral: protons = electrons = 24, so Z = 24, chromium. Check: 52 − 28 = 24.'},
+  {t:'iso',q:'How many protons, neutrons, and electrons are in this neutral atom?',show:true,z:33,A:75,fields:['p','n','e'],exp:'Z = 33, so 33 protons and 33 electrons. Neutrons = 75 − 33 = 42.'},
+  {t:'iso',q:'An atom contains 31 protons and 40 neutrons. Write its isotope notation.',build:true,z:31,A:71,fields:['A','Z','sym'],exp:'A = 31 + 40 = 71 (top), Z = 31 (bottom), element 31 is gallium, Ga.'}],
+ B:[
+  {t:'mc',q:'Which change produces an atom of a different element?',o:[['Adding a proton',1],['Adding a neutron',0],['Removing an electron',0],['Adding an electron',0]],exp:'Only the number of protons decides the element.'},
+  {t:'mc',q:'Isotopes of the same element have the same number of ___ but different numbers of ___.',o:[['protons; neutrons',1],['neutrons; protons',0],['protons; electrons',0],['electrons; neutrons',0]],exp:'Isotopes share the same number of protons and differ in neutrons, so their mass numbers differ.'},
+  {t:'mc',q:'Which statement about an electron is correct?',o:[['It has a negative charge and much less mass than a proton.',1],['It has a positive charge and is found in the nucleus.',0],['It has no charge and about the same mass as a neutron.',0],['It is counted in the mass number.',0]],exp:'An electron has a −1 charge and about 1/1836 the mass of a proton. It is outside the nucleus and not part of the mass number.'},
+  {t:'mc',q:'How many electrons are in a neutral atom of cobalt-59? (Cobalt’s atomic number is 27.)',o:[['27',1],['32',0],['59',0],['86',0]],exp:'In a neutral atom, electrons = protons = atomic number = 27. 32 is the number of neutrons.'},
+  {t:'mc',q:'Besides the atomic number, which information is needed to find the number of neutrons in an atom?',o:[['The mass number',1],['The number of electrons',0],['The element symbol',0],['The number of valence electrons',0]],exp:'Neutrons = mass number − atomic number, so you need the mass number.'},
+  {t:'num',q:'An atom contains 28 protons and 32 neutrons. What is its mass number?',ans:60,exp:'A = 28 + 32 = 60 (nickel-60).'},
+  {t:'num',q:'An atom has a mass number of 84 and contains 48 neutrons. What is its atomic number?',ans:36,exp:'Z = A − n = 84 − 48 = 36 (krypton).'},
+  {t:'num',q:'How many neutrons are in an atom of germanium-74? (Germanium’s atomic number is 32.)',ans:42,exp:'n = 74 − 32 = 42.'},
+  {t:'num',q:'A neutral atom contains 23 electrons and 28 neutrons. What is its mass number?',ans:51,exp:'Protons = electrons = 23. A = 23 + 28 = 51 (vanadium-51).'},
+  {t:'num',q:'An atom has atomic number 7 and mass number 15. How many neutrons does it have?',ans:8,exp:'n = 15 − 7 = 8 (nitrogen-15).'},
+  {t:'row',z:14,A:29,g:['p','n'],fields:['name','Z','A','e'],exp:'14 protons: Z = 14, silicon. A = 14 + 15 = 29. Electrons = 14.'},
+  {t:'row',z:35,A:81,g:['Z','A'],fields:['name','p','n','e'],exp:'Z = 35 is bromine. Protons = 35, neutrons = 81 − 35 = 46, electrons = 35.'},
+  {t:'row',z:16,A:34,g:['A','n','e'],fields:['name','Z','p'],exp:'Protons = electrons = 16, so Z = 16, sulfur. Check: 34 − 18 = 16.'},
+  {t:'iso',q:'How many protons, neutrons, and electrons are in this neutral atom?',show:true,z:29,A:63,fields:['p','n','e'],exp:'Z = 29: 29 protons and 29 electrons. Neutrons = 63 − 29 = 34.'},
+  {t:'iso',q:'An atom contains 9 protons and 10 neutrons. Write its isotope notation.',build:true,z:9,A:19,fields:['A','Z','sym'],exp:'A = 9 + 10 = 19 (top), Z = 9 (bottom), element 9 is fluorine, F.'}]};
+function gradeQ(q,a){if(q.t==='mc')return a!=null&&!!q.o[a][1];a=a||{};if(q.t==='num')return num(a.x)===q.ans;const v=vals(q.z,q.A);
+  return q.fields.every(f=>f==='name'?elMatch(a[f],q.z):f==='sym'?symCheck(a[f],q.z)==='ok':num(a[f])===v[f])}
+function answerText(q){if(q.t==='mc')return q.o.find(o=>o[1])[0];if(q.t==='num')return String(q.ans);const v=vals(q.z,q.A);return q.fields.map(f=>`${FL[f]}: ${f==='name'?NAME[q.z]:f==='sym'?SYM[q.z]:v[f]}`).join('; ')}
+const LBL={x:'Answer',name:'Element',Z:'Z',A:'A',p:'Protons',n:'Neutrons',e:'Electrons',sym:'Symbol'};
+function fin_in(i,f,val,dis,wide){return `<input type="text" data-q="${i}" data-f="${f}" ${f==='name'||f==='sym'?'autocomplete="off" spellcheck="false"':'inputmode="numeric" autocomplete="off"'} ${f==='sym'?'maxlength="2"':''} aria-label="Question ${i+1}: ${FL[f]||'answer'}" value="${esc(val||'')}" ${dis?'disabled':''} ${wide?'':'class="cell"'}>`}
+function R_final(){
+  const f=S.fin,Q=FIN[f.ver],res=f.res;
+  $('#finVer').textContent='Version '+f.ver;
+  $('#finList').innerHTML=Q.map((q,i)=>{
+    const a=f.ans[i],done=res&&(!f.retry||res[i]),state=res&&done?(res[i]?'ok':'no'):'',dis=!!(res&&done);
+    let body='';
+    if(q.t==='mc')body=q.o.map((o,j)=>`<label class="opt"><input type="radio" name="fq${i}" data-q="${i}" data-mc="${j}" ${a===j?'checked':''} ${dis?'disabled':''}><span>${o[0]}</span></label>`).join('');
+    else if(q.t==='num')body=`<label class="fld" style="max-width:220px">Answer${fin_in(i,'x',a&&a.x,dis,true)}</label>`;
+    else if(q.t==='row'){const v=vals(q.z,q.A);body=`<div class="tablewrap"><table><thead><tr><th>Element</th><th>Atomic number</th><th>Mass number</th><th>Protons</th><th>Neutrons</th><th>Electrons</th></tr></thead><tbody><tr>${['name','Z','A','p','n','e'].map(c=>q.g.includes(c)?`<td class="given">${v[c]}</td>`:`<td>${fin_in(i,c,a&&a[c],dis,c==='name')}</td>`).join('')}</tr></tbody></table></div>`}
+    else if(q.show)body=`<div class="row" style="gap:24px">${iso(q.A,q.z,SYM[q.z],'lg')}<div class="fields compact" style="flex:1;min-width:220px">${q.fields.map(c=>`<label class="fld">${FL[c]}${fin_in(i,c,a&&a[c],dis,true)}</label>`).join('')}</div></div>`;
+    else body=`<div class="isoBuild"><input type="text" inputmode="numeric" data-q="${i}" data-f="A" aria-label="Question ${i+1}: mass number, upper left" placeholder="A" value="${esc(a&&a.A||'')}" ${dis?'disabled':''}><input class="s" type="text" maxlength="2" data-q="${i}" data-f="sym" aria-label="Question ${i+1}: element symbol" placeholder="X" value="${esc(a&&a.sym||'')}" ${dis?'disabled':''}><input type="text" inputmode="numeric" data-q="${i}" data-f="Z" aria-label="Question ${i+1}: atomic number, lower left" placeholder="Z" value="${esc(a&&a.Z||'')}" ${dis?'disabled':''}></div>`;
+    const kind={mc:'Multiple choice',num:'Calculation',row:'Complete the table',iso:'Isotope notation'}[q.t];
+    const qtext=q.t==='row'?'Complete the row for this neutral atom.':q.q;
+    return `<div class="fq ${state}" id="fq${i}"><div class="qh"><span><span class="qn">${i+1}.</span> <b>${qtext}</b></span><span class="badge ${state}">${state==='ok'?'Correct':state==='no'?'Incorrect':kind}</span></div>${body}
+      ${state==='no'?`<div class="exp small"><b>Correct answer:</b> ${esc(answerText(q))}<br>${esc(q.exp)}</div>`:''}</div>`}).join('');
+  $('#finSubmit').textContent=f.retry?'Submit retry':'Submit assessment';
+  $('#finSubmit').disabled=!!(res&&!f.retry);
+  const rep=$('#finReport');
+  if(res){const c=res.filter(Boolean).length,pct=Math.round(c/Q.length*100);rep.hidden=false;
+    rep.innerHTML=`<div class="row" style="justify-content:space-between"><div><p class="eyebrow">Score report · Version ${f.ver}</p><div class="scoreline">${c} / ${Q.length} · ${pct}%</div></div>
+      <div class="row">${res.some(r=>!r)&&!f.retry?'<button class="btn" id="finRetry">Retry missed questions</button>':''}</div></div>
+      <div class="qchips">${res.map((r,i)=>`<button class="${r?'ok':'no'}" data-goto="${i}" aria-label="Question ${i+1}: ${r?'correct':'incorrect'}">${i+1}</button>`).join('')}</div>
+      <label class="fld" style="max-width:320px">Your name (optional, for the report)<input type="text" id="finName" value="${esc(f.name||'')}" autocomplete="off"></label>
+      <div class="row"><button class="btn ghost" id="finCopy">Copy report</button><span class="small" id="finCopyMsg" aria-live="polite"></span></div>
+      <textarea id="finText" readonly aria-label="Report text"></textarea>`;
+    $('#finText').value=reportText();
+    const rt=$('#finRetry');if(rt)rt.addEventListener('click',()=>{S.fin.retry=true;res.forEach((r,i)=>{if(!r)delete S.fin.ans[i]});save();R_final();const w=res.findIndex(r=>!r);$('#fq'+w).scrollIntoView({behavior:S.motion?'smooth':'auto',block:'center'})});
+    $('#finName').addEventListener('input',e=>{S.fin.name=e.target.value;save();$('#finText').value=reportText()});
+    $('#finCopy').addEventListener('click',()=>{const t=$('#finText');t.value=reportText();const ok=()=>$('#finCopyMsg').textContent='Copied.',fail=()=>{t.focus();t.select();$('#finCopyMsg').textContent='Press Ctrl+C (or ⌘C) to copy the selected text.'};try{navigator.clipboard.writeText(t.value).then(ok,fail)}catch(e){fail()}});
+  }else{rep.hidden=true;rep.innerHTML=''}
+}
+function reportText(){const f=S.fin,Q=FIN[f.ver],res=f.res||[],c=res.filter(Boolean).length;
+  const mods=TABS.filter(t=>t[0]!=='final').map(t=>`${t[1]}: ${DONE[t[0]]()?'complete':'not yet'}`).join('\n');
+  const sk=SKILLS.filter(s=>S.mastery[s[0]]).map(s=>'• '+s[1]).join('\n')||'• none yet';
+  const missed=res.map((r,i)=>r?null:i+1).filter(Boolean);
+  return `Build an Atom: student report\nName: ${f.name||'(not entered)'}\n\nModules\n${mods}\n\nSkills shown independently\n${sk}\n\nFinal assessment, Version ${f.ver}: ${c}/${Q.length} (${Math.round(c/Q.length*100)}%)\nMissed questions: ${missed.length?missed.join(', '):'none'}`}
+$('#finList').addEventListener('input',e=>{const t=e.target;if(!t.dataset.q)return;const i=+t.dataset.q;if(t.dataset.mc!=null){S.fin.ans[i]=+t.dataset.mc}else{S.fin.ans[i]=Object.assign({},S.fin.ans[i]||{},{[t.dataset.f]:t.value})}save()});
+$('#finList').addEventListener('change',e=>{const t=e.target;if(t.dataset.mc!=null){S.fin.ans[+t.dataset.q]=+t.dataset.mc;save()}});
+$('#finReport').addEventListener('click',e=>{const b=e.target.closest('[data-goto]');if(b)$('#fq'+b.dataset.goto).scrollIntoView({behavior:S.motion?'smooth':'auto',block:'center'})});
+$('#finSubmit').addEventListener('click',()=>{const f=S.fin,Q=FIN[f.ver];const blank=Q.findIndex((q,i)=>{if(f.res&&f.retry&&f.res[i])return false;const a=f.ans[i];if(q.t==='mc')return a==null;const flds=q.t==='num'?['x']:q.fields;return !a||flds.some(k=>!String(a[k]||'').trim())});
+  const fb=$('#finFb');
+  if(blank>=0&&!fb.dataset.warned){fb.className='fb no';fb.textContent=`Question ${blank+1} is not finished. Press Submit again to turn it in anyway.`;fb.dataset.warned='1';$('#fq'+blank).scrollIntoView({behavior:S.motion?'smooth':'auto',block:'center'});return}
+  delete fb.dataset.warned;fb.textContent='';
+  f.res=Q.map((q,i)=>f.res&&f.retry&&f.res[i]?true:gradeQ(q,f.ans[i]));f.retry=false;save();R_final();renderProgress();$('#finReport').scrollIntoView({behavior:S.motion?'smooth':'auto',block:'start'})});
+let swArm=0;$('#finSwitch').addEventListener('click',e=>{const b=e.target;if(!swArm){swArm=1;b.textContent='Click again to switch (clears answers)';setTimeout(()=>{swArm=0;b.textContent='Switch version'},3500);return}
+  swArm=0;b.textContent='Switch version';const nv=S.fin.ver==='A'?'B':'A';S.fin=Object.assign(DEF().fin,{ver:nv,name:S.fin.name});save();R_final();renderProgress()});
+
+/* ---------- tabs, progress, resets ---------- */
+const TABS=[['m1','1 · Particles'],['m2','2 · Build an atom'],['m3','3 · Z and A'],['m4','4 · Challenge'],['m5','5 · Atomic Detective'],['m6','6 · Isotope notation'],['final','Final assessment']];
+const DONE={
+  m1:()=>!!S.m1.sortOk&&M1Q.every((q,i)=>mcOk(q,S.m1.mc,'q'+i)),
+  m2:()=>!!(S.m2.step.A2&&S.m2.step.B1)&&mcOk(INVQ.A,S.m2.mc,'A')&&mcOk(INVQ.B,S.m2.mc,'B'),
+  m3:()=>P3.every(p=>S.m3.st[p.id]&&S.m3.st[p.id].solved),
+  m4:()=>T4.every((r,i)=>S.m4.rows[i]),
+  m5:()=>CASES.every((c,i)=>S.m5.st['c'+i]&&S.m5.st['c'+i].solved),
+  m6:()=>M6A.every((r,i)=>S.m6.st['a'+i]&&S.m6.st['a'+i].solved)&&!!S.m6.bNot&&!!S.m6.cOk1&&!!S.m6.cOk2,
+  final:()=>!!S.fin.res};
+function renderProgress(){
+  const d=TABS.filter(t=>DONE[t[0]]()).length;
+  $('#progress').innerHTML=`<span class="lbl">Progress</span><div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="${TABS.length}" aria-valuenow="${d}" aria-label="Modules complete"><i style="width:${d/TABS.length*100}%"></i></div><span class="lbl">${d} of ${TABS.length} complete</span>`;
+  $('#tabs').innerHTML=TABS.map(([k,l])=>`<button role="tab" id="tab-${k}" data-k="${k}" aria-selected="${S.tab===k}" aria-controls="sec-${k}">${l}${DONE[k]()?'<span class="ck" aria-label="complete">✓</span>':''}</button>`).join('');
+}
+const R={m1:R_m1,m2:R_m2,m3:R_m3,m4:R_m4,m5:R_m5,m6:R_m6,final:R_final};
+function showTab(k){S.tab=k;save();renderProgress();$$('section[data-tab]').forEach(s=>s.hidden=s.dataset.tab!==k)}
+$('#tabs').addEventListener('click',e=>{const b=e.target.closest('[data-k]');if(b){showTab(b.dataset.k);window.scrollTo({top:Math.min(window.scrollY,$('#tabs').offsetTop-8),behavior:'auto'})}});
+$('#tabs').addEventListener('keydown',e=>{if(e.key!=='ArrowRight'&&e.key!=='ArrowLeft')return;const i=TABS.findIndex(t=>t[0]===S.tab),j=(i+(e.key==='ArrowRight'?1:-1)+TABS.length)%TABS.length;showTab(TABS[j][0]);$('#tab-'+TABS[j][0]).focus()});
+const armed={};
+document.addEventListener('click',e=>{const b=e.target.closest('[data-reset]');if(!b)return;const k=b.dataset.reset;
+  if(!armed[k]){armed[k]=1;const old=b.textContent;b.textContent='Click again to reset';setTimeout(()=>{armed[k]=0;b.textContent=old},3500);return}
+  armed[k]=0;const key=k==='final'?'fin':k;S[key]=DEF()[key];if(k==='m1')sel=null;save();R[k]();renderProgress();b.textContent=k==='final'?'Reset assessment':'Reset module'});
+$$('section[data-tab]').forEach(s=>s.id='sec-'+s.dataset.tab);
+
+/* motion + periodic table drawer */
+function applyMotion(){document.body.classList.toggle('still',!S.motion);const b=$('#motionBtn');b.setAttribute('aria-pressed',String(S.motion));b.textContent='Animation: '+(S.motion?'on':'off')}
+$('#motionBtn').addEventListener('click',()=>{S.motion=!S.motion;save();applyMotion()});
+$('#drawerPT').innerHTML=ptable(0,true);
+$('#drawerPT').addEventListener('click',e=>{const c=e.target.closest('[data-z]');if(!c)return;const z=+c.dataset.z;$$('#drawerPT .pt-cell').forEach(x=>x.classList.toggle('hi',x===c));$('#ptInfo').innerHTML=`<b>${NAME[z]} (${SYM[z]})</b> · atomic number ${z} · average atomic mass ${MASS[z]} u`});
+const openPT=o=>{$('#ptDrawer').hidden=!o;$('#ptBtn').setAttribute('aria-expanded',String(o));if(o)$('#ptClose').focus()};
+$('#ptBtn').addEventListener('click',()=>openPT($('#ptDrawer').hidden));
+$('#ptClose').addEventListener('click',()=>{openPT(false);$('#ptBtn').focus()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!$('#ptDrawer').hidden){openPT(false);$('#ptBtn').focus()}});
+
+/* boot */
+applyMotion();
+Object.values(R).forEach(f=>f());
+showTab(TABS.some(t=>t[0]===S.tab)?S.tab:'m1');
+})();
+</script>
+
+</body>
+</html>
