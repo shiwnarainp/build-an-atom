@@ -15,9 +15,10 @@
 /* Layout: a lab bench. Header with progress, a tab strip of six stations plus the final check, one station open at a time. Model on the left, readouts on the right; stacks to one column on phones. */
 :root{
   --bg:#eef1f5; --panel:#ffffff; --panel2:#f6f8fb; --ink:#152030; --muted:#566476; --line:#d5dce5;
-  --accent:#a8560c; --accent-ink:#ffffff; --accent-soft:#fbead6;
-  --pro:#d63a3a; --neu:#7f8996; --ele:#2667d9; --pro-soft:#fde4e4; --neu-soft:#e8ebef; --ele-soft:#e0eafc;
-  --ok:#1d7f48; --ok-soft:#dff3e7; --no:#b83232; --no-soft:#fbe3e3; --warn:#8a5a00; --warn-soft:#fbf0d4;
+  --accent:#a0510a; --accent-ink:#ffffff; --accent-soft:#fbead6;
+  --pro:#c42d2d; --neu:#7f8996; --ele:#1f5cc9; --pro-soft:#fde4e4; --neu-soft:#e8ebef; --ele-soft:#e0eafc;
+  --ok:#1a7542; --ok-soft:#dff3e7; --no:#b83232; --no-soft:#fbe3e3; --warn:#8a5a00; --warn-soft:#fbf0d4;
+  --on-particle:#ffffff; --shadow:rgba(0,0,0,.18);
   --display:"Sora",ui-sans-serif,system-ui,sans-serif;
   --body:"Source Sans 3",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
   --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -28,14 +29,17 @@
   --accent:#f0a540; --accent-ink:#1a1206; --accent-soft:#3a2a12;
   --pro:#ff6464; --neu:#a3adb9; --ele:#5c9cff; --pro-soft:#3b1d20; --neu-soft:#252e39; --ele-soft:#1a2a45;
   --ok:#4fc887; --ok-soft:#15301f; --no:#ff7a7a; --no-soft:#3a1c1c; --warn:#f2c35a; --warn-soft:#3a2f12;
+  --on-particle:#0d131a; --shadow:rgba(0,0,0,.55);
   color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#0d131a; --panel:#141c26; --panel2:#19232f; --ink:#e6ecf3; --muted:#97a5b5; --line:#2a3644;
   --accent:#f0a540; --accent-ink:#1a1206; --accent-soft:#3a2a12;
   --pro:#ff6464; --neu:#a3adb9; --ele:#5c9cff; --pro-soft:#3b1d20; --neu-soft:#252e39; --ele-soft:#1a2a45;
   --ok:#4fc887; --ok-soft:#15301f; --no:#ff7a7a; --no-soft:#3a1c1c; --warn:#f2c35a; --warn-soft:#3a2f12;
+  --on-particle:#0d131a; --shadow:rgba(0,0,0,.55);
   color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.5;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
 .wrap{max-width:1140px;margin:0 auto}
@@ -106,7 +110,7 @@ tbody th{text-align:left;font-weight:600}
 .atom .pp circle{fill:var(--pro);stroke:var(--panel);stroke-width:.8}
 .atom .nn circle{fill:var(--neu);stroke:var(--panel);stroke-width:.8}
 .atom .ee circle{fill:var(--ele);stroke:var(--panel);stroke-width:.8}
-.atom text{fill:#fff;font:700 8px var(--mono);text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.atom text{fill:var(--on-particle);font:700 8px var(--mono);text-anchor:middle;dominant-baseline:central;pointer-events:none}
 .atom .shell{transform-origin:0 0;animation:spin var(--dur) linear infinite}
 .atom.click .pt{cursor:pointer}
 .atom.click .pt:hover circle{stroke:var(--accent);stroke-width:2}
@@ -173,7 +177,7 @@ fieldset.mc legend{font-weight:700;padding:0 6px}
 .pt-cell .pz{font-family:var(--mono);font-size:.55rem;color:var(--muted)} .pt-cell .ps{font-weight:700;font-size:.85rem}
 .pt-cell.hi{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)} .pt-cell.hi .pz{color:var(--accent-ink)}
 button.pt-cell{cursor:pointer;font:inherit;color:inherit}
-.drawer{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--panel);border-top:1px solid var(--line);box-shadow:0 -8px 30px rgba(0,0,0,.18);
+.drawer{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--panel);border-top:1px solid var(--line);box-shadow:0 -8px 30px var(--shadow);
   padding:14px max(16px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));max-height:70vh;overflow:auto}
 .drawer .wrap{display:grid;gap:10px}
 
@@ -259,6 +263,7 @@ textarea{width:100%;min-height:150px;border:1px solid var(--line);border-radius:
   </div>
   <div class="tools">
     <button class="btn ghost" id="motionBtn" aria-pressed="true">Animation: on</button>
+    <button class="btn ghost" id="themeBtn" aria-label="Color theme: Auto (follows system). Click to switch to Light.">Theme: Auto</button>
     <button class="btn ghost" id="ptBtn" aria-expanded="false" aria-controls="ptDrawer">Periodic table</button>
   </div>
 </div></header>
@@ -923,6 +928,20 @@ $$('section[data-tab]').forEach(s=>s.id='sec-'+s.dataset.tab);
 /* motion + periodic table drawer */
 function applyMotion(){document.body.classList.toggle('still',!S.motion);const b=$('#motionBtn');b.setAttribute('aria-pressed',String(S.motion));b.textContent='Animation: '+(S.motion?'on':'off')}
 $('#motionBtn').addEventListener('click',()=>{S.motion=!S.motion;save();applyMotion()});
+
+/* theme: Auto (host/system) -> Light -> Dark. All colors are CSS tokens, so no re-render is needed. */
+const hostTheme=document.documentElement.getAttribute('data-theme');
+const THEMES=['auto','light','dark'],TNAME={auto:'Auto',light:'Light',dark:'Dark'};
+let themePref='auto';
+try{const t=localStorage.getItem('theme-pref');if(THEMES.includes(t))themePref=t}catch(e){}
+function applyTheme(){const r=document.documentElement;
+  if(themePref==='auto'){if(hostTheme!==null)r.setAttribute('data-theme',hostTheme);else r.removeAttribute('data-theme')}
+  else r.setAttribute('data-theme',themePref);
+  const b=$('#themeBtn'),nx=THEMES[(THEMES.indexOf(themePref)+1)%3];
+  b.textContent='Theme: '+TNAME[themePref];
+  b.setAttribute('aria-label','Color theme: '+TNAME[themePref]+(themePref==='auto'?' (follows system)':'')+'. Click to switch to '+TNAME[nx]+'.')}
+$('#themeBtn').addEventListener('click',()=>{themePref=THEMES[(THEMES.indexOf(themePref)+1)%3];try{localStorage.setItem('theme-pref',themePref)}catch(e){}applyTheme()});
+applyTheme();
 $('#drawerPT').innerHTML=ptable(0,true);
 $('#drawerPT').addEventListener('click',e=>{const c=e.target.closest('[data-z]');if(!c)return;const z=+c.dataset.z;$$('#drawerPT .pt-cell').forEach(x=>x.classList.toggle('hi',x===c));$('#ptInfo').innerHTML=`<b>${NAME[z]} (${SYM[z]})</b> · atomic number ${z} · average atomic mass ${MASS[z]} u`});
 const openPT=o=>{$('#ptDrawer').hidden=!o;$('#ptBtn').setAttribute('aria-expanded',String(o));if(o)$('#ptClose').focus()};
